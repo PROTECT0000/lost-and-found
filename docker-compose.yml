@@ -1,24 +1,138 @@
-# Local S3-compatible storage for development (SeaweedFS).
-# S3 endpoint: http://localhost:8333 (access key: devaccesskey / secret: devsecretkey)
-services:
-  seaweedfs:
-    image: chrislusf/seaweedfs:latest
-    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
-    ports:
-      - "8333:8333"
-    volumes:
-      - seaweedfs-data:/data
-      - ./dev/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+# Full local stack: MySQL, MinIO, backend, frontend, Prometheus and Grafana.
+#
+#   docker compose up -d --build            # build backend/frontend from source
+#   docker compose pull && docker compose up -d --no-build   # or run the images CI publishes
+#
+#   App            http://localhost:8080
+#   API            http://localhost:8787
+#   MinIO console  http://localhost:9001   (S3 API on :9000)
+#   Prometheus     http://localhost:9090
+#   Grafana        http://localhost:3000   (dashboard "Lost & Found")
+#
+# Defaults are for local use only. Override them in a root .env file (see .env.example).
 
-  create-bucket:
-    image: chrislusf/seaweedfs:latest
+x-minio-user: &minio-user ${MINIO_ROOT_USER:-devaccesskey}
+x-minio-password: &minio-password ${MINIO_ROOT_PASSWORD:-devsecretkey}
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: lost_and_found
+      MYSQL_USER: ${MYSQL_USER:-lostfound}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-lostfound}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # A real query as the app user over TCP: mysqladmin ping also succeeds against the
+      # temporary server the image runs during first-time initialisation.
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\" -e 'SELECT 1' lost_and_found"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # MinIO no longer publishes official images; this is Bitnami's last free build (frozen,
+  # no further updates). MINIO_DEFAULT_BUCKETS creates the bucket before the server reports healthy.
+  minio:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    environment:
+      MINIO_ROOT_USER: *minio-user
+      MINIO_ROOT_PASSWORD: *minio-password
+      MINIO_DEFAULT_BUCKETS: lost-and-found
+      MINIO_BROWSER: "on"   # Bitnami disables the web console by default
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    image: ghcr.io/protect0000/lost-and-found-backend:${IMAGE_TAG:-latest}
+    build: ./backend
+    entrypoint: ["/app/migrate"]
+    command: ["up"]
+    environment:
+      DATABASE_DSN: ${MYSQL_USER:-lostfound}:${MYSQL_PASSWORD:-lostfound}@tcp(mysql:3306)/lost_and_found
     depends_on:
-      - seaweedfs
-    entrypoint: >
-      /bin/sh -c "
-      until echo 's3.bucket.list' | weed shell -master=seaweedfs:9333 >/dev/null 2>&1; do sleep 1; done;
-      echo 's3.bucket.create -name lost-and-found' | weed shell -master=seaweedfs:9333;
-      "
+      mysql:
+        condition: service_healthy
+
+  backend:
+    image: ghcr.io/protect0000/lost-and-found-backend:${IMAGE_TAG:-latest}
+    build: ./backend
+    environment:
+      PORT: "8787"
+      METRICS_ADDR: ":9091"
+      LOG_FORMAT: json
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_DSN: ${MYSQL_USER:-lostfound}:${MYSQL_PASSWORD:-lostfound}@tcp(mysql:3306)/lost_and_found
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-me}
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: lost-and-found
+      S3_ACCESS_KEY_ID: *minio-user
+      S3_SECRET_ACCESS_KEY: *minio-password
+    ports:
+      - "8787:8787"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/protect0000/lost-and-found-frontend:${IMAGE_TAG:-latest}
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on: [backend]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on: [backend]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.0.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/lost-and-found.json
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on: [prometheus]
+    restart: unless-stopped
 
 volumes:
-  seaweedfs-data:
+  mysql-data:
+  minio-data:
+  prometheus-data:
+  grafana-data:

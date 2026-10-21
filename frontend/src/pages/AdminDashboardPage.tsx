@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Button } from '@mui/material'
+import { Button, Stack } from '@mui/material'
 import { Link as RouterLink } from 'react-router-dom'
 import { MdAdd } from 'react-icons/md'
 import { useAdminStore } from '../store/useAdminStore'
 import { useItemStore } from '../store/useItemStore'
+import { useItemList } from '../hooks/useItemList'
 import { useItemActions } from '../hooks/useItemActions'
 import type { Item } from '../types/item'
 import PageHeader from '../components/common/PageHeader'
@@ -12,20 +13,18 @@ import ConfirmDialog from '../components/common/ConfirmDialog'
 import ItemFilters from '../components/items/ItemFilters'
 import StatsOverview from '../components/admin/StatsOverview'
 import ItemsTable from '../components/admin/ItemsTable'
+import ExportMenu from '../components/admin/ExportMenu'
 
 export default function AdminDashboardPage() {
   const { stats, error: statsError, fetchStats } = useAdminStore()
-  const { items, meta, filters, loading, saving, error, fetchItems, setFilters } = useItemStore()
+  const { items, meta, filters, loading, error, setFilters, resetFilters, refresh } = useItemList()
+  const saving = useItemStore((s) => s.saving)
   const { toggleStatus, remove } = useItemActions()
   const [pendingDelete, setPendingDelete] = useState<Item | null>(null)
 
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
-
-  useEffect(() => {
-    fetchItems()
-  }, [filters, fetchItems])
 
   const handleToggleStatus = async (item: Item) => {
     if (await toggleStatus(item)) fetchStats()
@@ -37,7 +36,7 @@ export default function AdminDashboardPage() {
     setPendingDelete(null)
     if (deleted) {
       fetchStats()
-      fetchItems()
+      refresh()
     }
   }
 
@@ -46,16 +45,19 @@ export default function AdminDashboardPage() {
       <PageHeader
         title="Admin dashboard"
         action={
-          <Button variant="contained" component={RouterLink} to="/items/new" startIcon={<MdAdd />}>
-            New item
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <ExportMenu filters={filters} disabled={loading || meta.total === 0} />
+            <Button variant="contained" component={RouterLink} to="/items/new" startIcon={<MdAdd />}>
+              New item
+            </Button>
+          </Stack>
         }
       />
       {statsError && <ErrorState message={statsError} onRetry={fetchStats} />}
       <StatsOverview stats={stats} />
-      <ItemFilters />
+      <ItemFilters filters={filters} onChange={setFilters} onReset={resetFilters} />
       {error ? (
-        <ErrorState message={error} onRetry={fetchItems} />
+        <ErrorState message={error} onRetry={refresh} />
       ) : (
         <ItemsTable
           items={items}

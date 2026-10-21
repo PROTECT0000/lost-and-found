@@ -2,50 +2,41 @@ import { create } from 'zustand'
 import { itemsApi } from '../api/items'
 import { getErrorMessage } from '../api/client'
 import type { Item, ItemFilters, ItemInput, PaginationMeta } from '../types/item'
-
-const DEFAULT_FILTERS: ItemFilters = { page: 1, limit: 12 }
+import { DEFAULT_PAGE_SIZE } from '../constants/items'
 
 interface ItemState {
   items: Item[]
   meta: PaginationMeta
-  filters: ItemFilters
   current: Item | null
   loading: boolean
   saving: boolean
   error: string | null
-  setFilters: (filters: Partial<ItemFilters>) => void
-  resetFilters: () => void
-  fetchItems: () => Promise<void>
+  fetchItems: (filters: ItemFilters) => Promise<void>
   fetchItem: (id: string) => Promise<void>
   createItem: (input: ItemInput) => Promise<Item>
   updateItem: (id: string, input: Partial<ItemInput>) => Promise<Item>
   deleteItem: (id: string) => Promise<void>
 }
 
-export const useItemStore = create<ItemState>((set, get) => ({
+// Increments per list request so a slow, outdated response never overwrites a newer one.
+let listRequest = 0
+
+export const useItemStore = create<ItemState>((set) => ({
   items: [],
-  meta: { page: 1, limit: DEFAULT_FILTERS.limit, total: 0 },
-  filters: DEFAULT_FILTERS,
+  meta: { page: 1, limit: DEFAULT_PAGE_SIZE, total: 0 },
   current: null,
   loading: false,
   saving: false,
   error: null,
 
-  // Any filter change other than page resets pagination to the first page.
-  setFilters: (filters) =>
-    set((state) => ({
-      filters: { ...state.filters, page: 1, ...filters },
-    })),
-
-  resetFilters: () => set({ filters: DEFAULT_FILTERS }),
-
-  fetchItems: async () => {
+  fetchItems: async (filters) => {
+    const request = ++listRequest
     set({ loading: true, error: null })
     try {
-      const { data, meta } = await itemsApi.list(get().filters)
-      set({ items: data, meta, loading: false })
+      const { data, meta } = await itemsApi.list(filters)
+      if (request === listRequest) set({ items: data, meta, loading: false })
     } catch (error) {
-      set({ error: getErrorMessage(error), loading: false })
+      if (request === listRequest) set({ error: getErrorMessage(error), loading: false })
     }
   },
 
