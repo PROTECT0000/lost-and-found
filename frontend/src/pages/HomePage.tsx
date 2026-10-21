@@ -1,25 +1,20 @@
-import { useEffect } from 'react'
-import { Box, Button, Pagination } from '@mui/material'
+import { Button } from '@mui/material'
 import { Link as RouterLink } from 'react-router-dom'
 import { MdAdd } from 'react-icons/md'
-import { useItemStore } from '../store/useItemStore'
+import { useItemList } from '../hooks/useItemList'
 import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
 import ErrorState from '../components/common/ErrorState'
 import LoadingState from '../components/common/LoadingState'
 import ItemFilters from '../components/items/ItemFilters'
 import ItemGrid from '../components/items/ItemGrid'
+import ItemsPagination from '../components/items/ItemsPagination'
 
 export default function HomePage() {
-  const { items, meta, filters, loading, error, fetchItems, setFilters } = useItemStore()
-  const pageCount = Math.ceil(meta.total / meta.limit)
-
-  useEffect(() => {
-    fetchItems()
-  }, [filters, fetchItems])
+  const { items, meta, filters, loading, error, setFilters, resetFilters, refresh } = useItemList()
 
   const renderContent = () => {
-    if (error) return <ErrorState message={error} onRetry={fetchItems} />
+    if (error) return <ErrorState message={error} onRetry={refresh} />
     if (loading) return <LoadingState />
     if (items.length === 0) {
       return (
@@ -47,17 +42,14 @@ export default function HomePage() {
           </Button>
         }
       />
-      <ItemFilters />
+      <ItemFilters filters={filters} onChange={setFilters} onReset={resetFilters} />
       {renderContent()}
-      {pageCount > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <Pagination
-            color="primary"
-            count={pageCount}
-            page={filters.page}
-            onChange={(_, page) => setFilters({ page })}
-          />
-        </Box>
+      {!loading && !error && (
+        <ItemsPagination
+          meta={meta}
+          onPageChange={(page) => setFilters({ page })}
+          onPageSizeChange={(limit) => setFilters({ limit })}
+        />
       )}
     </>
   )

@@ -12,13 +12,11 @@ import {
 } from '@mui/material'
 import { Link as RouterLink } from 'react-router-dom'
 import type { Item, PaginationMeta } from '../../types/item'
-import { categoryLabel } from '../../constants/items'
+import { PAGE_SIZE_OPTIONS, categoryLabel } from '../../constants/items'
 import { formatDate, formatDateTime } from '../../utils/format'
 import StatusChip from '../items/StatusChip'
 import TypeChip from '../items/TypeChip'
 import ItemRowActions from './ItemRowActions'
-
-const ROWS_PER_PAGE_OPTIONS = [12, 24, 48]
 
 interface ItemsTableProps {
   items: Item[]
@@ -102,7 +100,7 @@ export default function ItemsTable({
         count={meta.total}
         page={meta.page - 1}
         rowsPerPage={meta.limit}
-        rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
+        rowsPerPageOptions={PAGE_SIZE_OPTIONS}
         onPageChange={(_, page) => onPageChange(page + 1)}
         onRowsPerPageChange={(e) => onRowsPerPageChange(Number(e.target.value))}
       />

@@ -7,16 +7,38 @@ Full-stack CRUD app for reporting lost and found items.
 
 ## Local development
 
-Requires Go 1.26+ (fetched automatically by `go` when `GOTOOLCHAIN=auto`), a MySQL 8 database,
-and Docker for local S3-compatible storage ([SeaweedFS](https://github.com/seaweedfs/seaweedfs)).
+## Run everything with Docker
 
 ```bash
-# Storage (S3 API on http://localhost:8333, bucket "lost-and-found" is created automatically)
-docker compose up -d
+cp .env.example .env       # optional: override the local defaults
+docker compose up -d --build
+```
+
+| Service | URL |
+| --- | --- |
+| App (nginx, proxies `/api` to the backend) | http://localhost:8080 |
+| API | http://localhost:8787 |
+| MinIO console (S3 API on `:9000`) | http://localhost:9001 (`devaccesskey` / `devsecretkey`) |
+| Prometheus | http://localhost:9090 |
+| Grafana, "Lost & Found" dashboard | http://localhost:3000 (`admin` / `admin`) |
+
+MySQL (`localhost:3306`, `lostfound` / `lostfound`) is migrated automatically by the one-shot `migrate`
+service, and MinIO creates the `lost-and-found` bucket on startup. Load sample items with
+`docker compose run --rm migrate seed`. MinIO no longer publishes official images, so this uses
+Bitnami's last free build (`bitnamilegacy/minio`), which no longer receives updates.
+
+## Local development
+
+Requires Go 1.26+ (fetched automatically by `go` when `GOTOOLCHAIN=auto`) and Docker for MySQL and
+[MinIO](https://github.com/minio/minio).
+
+```bash
+# MySQL (localhost:3306) and MinIO (S3 API on http://localhost:9000, bucket "lost-and-found" created automatically)
+docker compose up -d mysql minio
 
 # Backend (http://localhost:8787, metrics on :9091)
 cd backend
-cp .env.example .env       # set DATABASE_DSN, ADMIN_PASSWORD, JWT_SECRET
+cp .env.example .env       # defaults match docker compose; set ADMIN_PASSWORD, JWT_SECRET
 make migrate               # apply migrations (goose)
 make seed                  # optional sample items
 make run
@@ -46,6 +68,12 @@ Visitors can browse and report items. Editing, resolving and deleting are admin-
 
 - Log in at `/admin/login` with `ADMIN_PASSWORD` (sessions last 8 hours).
 - `/admin` shows stats (totals, open/resolved, lost/found, by category) and a table of all items with quick actions.
+- **Export** on `/admin` downloads every item matching the current filters (all pages) as Excel (`.xlsx`) or PDF.
+  Files are built in the browser (`write-excel-file`, `jsPDF`); images are not included.
+
+Lists are paginated (12, 24 or 48 per page). Filters, page and page size are kept in the URL
+(e.g. `/?type=lost&page=2&limit=24`), so refresh, back/forward and shared links keep their place,
+and the home page and admin dashboard each keep their own.
 
 ## API
 
@@ -92,6 +120,10 @@ Categories: `electronics`, `wallet`, `keys`, `bag`, `clothing`, `documents`, `je
   `http_requests_total`, `http_request_duration_seconds`, `http_requests_in_flight`,
   `lostfound_image_uploads_total{result}`, `lostfound_image_cleanups_total{result}`, MySQL pool stats
   (`go_sql_*`), Go runtime and process metrics.
+- **Dashboard:** `docker compose up` runs Prometheus (scraping `backend:9091`, config in
+  `monitoring/prometheus/prometheus.yml`) and Grafana with a provisioned "Lost & Found" dashboard
+  (`monitoring/grafana/dashboards/lost-and-found.json`): up/down, request rate, 5xx rate, latency
+  percentiles per route, status classes, image uploads and cleanups, MySQL pool usage and waits, and Go runtime.
 - **Health:** `/api/health` (liveness) and `/api/health/ready` (readiness; details only in logs).
 
 ## Deploy

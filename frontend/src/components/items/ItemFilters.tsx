@@ -1,23 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, InputAdornment, Paper, Stack, TextField } from '@mui/material'
 import { MdClear, MdSearch } from 'react-icons/md'
 import { ITEM_CATEGORY_OPTIONS, ITEM_STATUS_OPTIONS } from '../../constants/items'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
-import { useItemStore } from '../../store/useItemStore'
+import type { ItemFilters as Filters } from '../../types/item'
 import SelectField from '../common/SelectField'
 import ItemTypeToggle from './ItemTypeToggle'
 
-export default function ItemFilters() {
-  const filters = useItemStore((s) => s.filters)
-  const setFilters = useItemStore((s) => s.setFilters)
-  const resetFilters = useItemStore((s) => s.resetFilters)
+interface ItemFiltersProps {
+  filters: Filters
+  onChange: (change: Partial<Filters>, options?: { replace?: boolean }) => void
+  onReset: () => void
+}
 
+export default function ItemFilters({ filters, onChange: setFilters, onReset }: ItemFiltersProps) {
   const [search, setSearch] = useState(filters.q ?? '')
   const debouncedSearch = useDebouncedValue(search)
 
+  // Follow the URL when it changes underneath us (back/forward, Clear), but leave the box alone
+  // when it already matches, so whitespace the user is still typing is kept.
+  const [syncedQuery, setSyncedQuery] = useState(filters.q)
+  if (filters.q !== syncedQuery) {
+    setSyncedQuery(filters.q)
+    if (search.trim() !== (filters.q ?? '')) setSearch(filters.q ?? '')
+  }
+
+  // Only push the search when the user typed something new, so a stale debounced value never
+  // overwrites a query that just came from the URL. Typing replaces history instead of adding to it.
+  const lastPushed = useRef(debouncedSearch)
   useEffect(() => {
-    if ((filters.q ?? '') !== debouncedSearch) {
-      setFilters({ q: debouncedSearch || undefined })
+    if (debouncedSearch === lastPushed.current) return
+    lastPushed.current = debouncedSearch
+    if ((filters.q ?? '') !== debouncedSearch.trim()) {
+      setFilters({ q: debouncedSearch.trim() || undefined }, { replace: true })
     }
   }, [debouncedSearch, filters.q, setFilters])
 
@@ -70,7 +85,7 @@ export default function ItemFilters() {
             startIcon={<MdClear />}
             onClick={() => {
               setSearch('')
-              resetFilters()
+              onReset()
             }}
           >
             Clear

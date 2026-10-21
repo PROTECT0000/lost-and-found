@@ -23,3 +23,7 @@ export const ITEM_CATEGORY_OPTIONS: { value: ItemCategory; label: string }[] = [
 
 export const categoryLabel = (value: ItemCategory) =>
   ITEM_CATEGORY_OPTIONS.find((o) => o.value === value)?.label ?? value
+
+/** Page sizes offered in lists; multiples of 3 and 4 so grid rows stay full. */
+export const PAGE_SIZE_OPTIONS = [12, 24, 48]
+export const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0]
