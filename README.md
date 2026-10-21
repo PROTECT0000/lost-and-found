@@ -126,6 +126,26 @@ Categories: `electronics`, `wallet`, `keys`, `bag`, `clothing`, `documents`, `je
   percentiles per route, status classes, image uploads and cleanups, MySQL pool usage and waits, and Go runtime.
 - **Health:** `/api/health` (liveness) and `/api/health/ready` (readiness; details only in logs).
 
+## CI/CD
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and on pushes to `master` and `v*` tags:
+
+- **Backend:** `gofmt`, `go vet`, and `go test -race` including the MySQL repository tests (against a MySQL 8.4 service container).
+- **Frontend:** `npm ci`, lint, tests and production build.
+- **Config:** `docker compose config`, `promtool check config`, and the Grafana dashboard JSON.
+- **Images:** builds `linux/amd64` and `linux/arm64` images of the backend and frontend once all checks pass. Pull requests only build them.
+  Pushes to `master` publish `latest` and `sha-<commit>`, and `v1.2.3` tags publish `1.2.3` and `1.2`, to
+  `ghcr.io/protect0000/lost-and-found-backend` and `-frontend`.
+
+To run the published images instead of building locally (set `IMAGE_TAG` to pin a version):
+
+```bash
+docker compose pull && docker compose up -d --no-build
+```
+
+New GHCR packages are private by default. Make them public in the package settings on GitHub, or
+`docker login ghcr.io` on the server first.
+
 ## Deploy
 
 ```bash

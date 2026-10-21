@@ -1,6 +1,7 @@
 # Full local stack: MySQL, MinIO, backend, frontend, Prometheus and Grafana.
 #
-#   docker compose up -d --build
+#   docker compose up -d --build            # build backend/frontend from source
+#   docker compose pull && docker compose up -d --no-build   # or run the images CI publishes
 #
 #   App            http://localhost:8080
 #   API            http://localhost:8787
@@ -56,6 +57,7 @@ services:
     restart: unless-stopped
 
   migrate:
+    image: ghcr.io/protect0000/lost-and-found-backend:${IMAGE_TAG:-latest}
     build: ./backend
     entrypoint: ["/app/migrate"]
     command: ["up"]
@@ -66,6 +68,7 @@ services:
         condition: service_healthy
 
   backend:
+    image: ghcr.io/protect0000/lost-and-found-backend:${IMAGE_TAG:-latest}
     build: ./backend
     environment:
       PORT: "8787"
@@ -91,6 +94,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ghcr.io/protect0000/lost-and-found-frontend:${IMAGE_TAG:-latest}
     build: ./frontend
     ports:
       - "8080:80"
