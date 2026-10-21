@@ -34,6 +34,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
+    restart: unless-stopped
 
   # MinIO no longer publishes official images; this is Bitnami's last free build (frozen,
   # no further updates). MINIO_DEFAULT_BUCKETS creates the bucket before the server reports healthy.
