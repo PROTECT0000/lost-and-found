@@ -58,6 +58,8 @@ func NewRouter(d Deps) http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/health", d.Health.Live)
 		r.Get("/health/ready", d.Health.Ready)
+		r.Get("/openapi.yaml", handler.OpenAPI)
+		r.Get("/docs", handler.Docs)
 
 		r.Route("/items", func(r chi.Router) {
 			r.Get("/", d.Items.List)

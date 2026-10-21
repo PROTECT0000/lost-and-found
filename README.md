@@ -18,6 +18,7 @@ docker compose up -d --build
 | --- | --- |
 | App (nginx, proxies `/api` to the backend) | http://localhost:8080 |
 | API | http://localhost:8787 |
+| API docs (Swagger UI; spec at `/api/openapi.yaml`) | http://localhost:8787/api/docs |
 | MinIO console (S3 API on `:9000`) | http://localhost:9001 (`devaccesskey` / `devsecretkey`) |
 | Prometheus | http://localhost:9090 |
 | Grafana, "Lost & Found" dashboard | http://localhost:3000 (`admin` / `admin`) |
@@ -77,6 +78,8 @@ Lists are paginated (12, 24 or 48 per page). Filters, page and page size are kep
 and the home page and admin dashboard each keep their own.
 
 ## API
+
+Full reference: [`backend/api/openapi.yaml`](backend/api/openapi.yaml) (OpenAPI 3.1), browsable at `/api/docs`.
 
 🔒 = requires `Authorization: Bearer <token>` from `/api/auth/login`.
 

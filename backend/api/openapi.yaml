@@ -1,0 +1,570 @@
+openapi: 3.1.0
+info:
+  title: Lost & Found API
+  version: 1.0.0
+  description: |
+    Report and browse lost and found items.
+
+    Reading items, reporting items and uploading photos are public. Changing or deleting items
+    and the admin statistics need an admin token: call `POST /api/auth/login` with the admin
+    password and send the returned token as `Authorization: Bearer <token>`.
+
+    Every error response has the shape `{"error": "...", "issues": [...]}`; `issues` is only
+    present for validation errors (400). Every response carries an `X-Request-ID` header that
+    matches the server logs.
+servers:
+  - url: /
+    description: This server
+# Public by default; admin operations override this with bearerAuth.
+security: []
+tags:
+  - name: Items
+    description: Lost and found item reports.
+  - name: Uploads
+    description: Item photos, stored in S3-compatible storage.
+  - name: Auth
+    description: Admin login.
+  - name: Admin
+    description: Admin dashboard data.
+  - name: Health
+    description: Health checks and this documentation.
+
+paths:
+  /api/items:
+    get:
+      tags: [Items]
+      summary: List items
+      description: One page of items matching the filters, newest first.
+      operationId: listItems
+      parameters:
+        - name: type
+          in: query
+          schema: { $ref: '#/components/schemas/ItemType' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ItemStatus' }
+        - name: category
+          in: query
+          schema: { $ref: '#/components/schemas/Category' }
+        - name: q
+          in: query
+          description: Case-insensitive search in title, description and location.
+          schema: { type: string, maxLength: 100 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 12 }
+      responses:
+        '200':
+          description: A page of items.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ItemPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      tags: [Items]
+      summary: Report an item
+      description: |
+        Public. To attach a photo, upload it first with `POST /api/uploads` and pass the returned
+        `key` as `image_key`.
+      operationId: createItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateItem' }
+      responses:
+        '201':
+          description: The created item.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    get:
+      tags: [Items]
+      summary: Get an item
+      operationId: getItem
+      responses:
+        '200':
+          description: The item.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    patch:
+      tags: [Items]
+      summary: Update an item
+      description: |
+        Only the fields present in the body change. Setting `status` to `resolved` records
+        `resolved_at` (kept if the item was already resolved) and accepts `resolved_by` and
+        `resolution_note`; setting it to `open` clears all three. When the photo is replaced or
+        removed, the old image is deleted once no other item uses it.
+      operationId: updateItem
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateItem' }
+            examples:
+              resolve:
+                summary: Mark resolved
+                value:
+                  status: resolved
+                  resolved_by: Andi
+                  resolution_note: Picked up at the front desk, ID checked.
+              reopen:
+                summary: Reopen
+                value:
+                  status: open
+              rename:
+                summary: Change a field
+                value:
+                  title: Black leather wallet
+      responses:
+        '200':
+          description: The updated item.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Item' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    delete:
+      tags: [Items]
+      summary: Delete an item
+      description: Also deletes its photo unless another item uses the same image.
+      operationId: deleteItem
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/uploads:
+    post:
+      tags: [Uploads]
+      summary: Upload a photo
+      description: |
+        Public. The file type is detected from its content, not its name or the client's
+        Content-Type. Use the returned `key` as an item's `image_key`.
+      operationId: uploadImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG, WebP or GIF, at most 5 MB.
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadedImage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '415':
+          description: Not a JPEG, PNG, WebP or GIF image.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502': { $ref: '#/components/responses/StorageUnavailable' }
+
+  /api/uploads/items/{file}:
+    get:
+      tags: [Uploads]
+      summary: Get a photo
+      description: Streams an uploaded image. URLs never change content, so responses are cached for a year.
+      operationId: getImage
+      parameters:
+        - name: file
+          in: path
+          required: true
+          description: File name from the image key, e.g. `0b6c3d0e-8f3a-4c41-9b7e-1f2a3b4c5d6e.png`.
+          schema: { type: string }
+      responses:
+        '200':
+          description: The image.
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/StorageUnavailable' }
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in as admin
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string }
+      responses:
+        '200':
+          description: A signed admin token.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expiresAt]
+                properties:
+                  token: { type: string, description: 'JWT to send as `Authorization: Bearer <token>`.' }
+                  expiresAt: { type: integer, format: int64, description: Expiry as a Unix timestamp in milliseconds. }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401':
+          description: Wrong password.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Check the admin token
+      operationId: me
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The token is valid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  role: { type: string, const: admin }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/admin/stats:
+    get:
+      tags: [Admin]
+      summary: Dashboard totals
+      operationId: adminStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Item counts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Stats' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Liveness
+      operationId: health
+      responses:
+        '200':
+          description: The process is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /api/health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness
+      description: Pings the database and image storage (2 second timeout). Error details are only logged.
+      operationId: ready
+      responses:
+        '200':
+          description: All dependencies are reachable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Readiness' }
+        '503':
+          description: At least one dependency is unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Readiness' }
+
+  /api/openapi.yaml:
+    get:
+      tags: [Health]
+      summary: This OpenAPI document
+      operationId: openapi
+      responses:
+        '200':
+          description: The OpenAPI 3.1 document.
+          content:
+            application/yaml:
+              schema: { type: string }
+
+  /api/docs:
+    get:
+      tags: [Health]
+      summary: Interactive API docs
+      operationId: docs
+      responses:
+        '200':
+          description: Swagger UI for this document.
+          content:
+            text/html:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token from `POST /api/auth/login`.
+
+  parameters:
+    ItemId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    ItemType:
+      type: string
+      enum: [lost, found]
+    ItemStatus:
+      type: string
+      enum: [open, resolved]
+    Category:
+      type: string
+      enum: [electronics, wallet, keys, bag, clothing, documents, jewelry, other]
+    ImageKey:
+      type: string
+      pattern: '^items/[0-9a-f-]{36}\.(jpg|png|webp|gif)$'
+      description: Key returned by `POST /api/uploads`.
+      examples: [items/0b6c3d0e-8f3a-4c41-9b7e-1f2a3b4c5d6e.png]
+    OccurredAt:
+      type: string
+      format: date-time
+      description: RFC 3339 with a timezone; stored and returned in UTC.
+      examples: ['2026-10-21T09:30:00+07:00']
+
+    Item:
+      type: object
+      required: [id, type, title, description, category, location, occurred_at, contact_name, contact_info,
+        image_key, image_url, status, resolved_by, resolution_note, resolved_at, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/ItemType' }
+        title: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 2000 }
+        category: { $ref: '#/components/schemas/Category' }
+        location: { type: string, maxLength: 200 }
+        occurred_at: { type: string, format: date-time, description: When the item was lost or found (UTC). }
+        contact_name: { type: string, maxLength: 100 }
+        contact_info: { type: string, maxLength: 200, description: Email address or phone number. }
+        image_key:
+          oneOf:
+            - $ref: '#/components/schemas/ImageKey'
+            - type: 'null'
+        image_url:
+          type: [string, 'null']
+          description: URL to show the photo, derived from image_key.
+        status: { $ref: '#/components/schemas/ItemStatus' }
+        resolved_by: { type: [string, 'null'], maxLength: 100, description: Who took the item. Only set when resolved. }
+        resolution_note: { type: [string, 'null'], maxLength: 500 }
+        resolved_at: { type: [string, 'null'], format: date-time, description: When it was marked resolved (UTC). }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateItem:
+      type: object
+      required: [type, title, category, location, occurred_at, contact_name, contact_info]
+      properties:
+        type: { $ref: '#/components/schemas/ItemType' }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 2000 }
+        category: { $ref: '#/components/schemas/Category' }
+        location: { type: string, minLength: 1, maxLength: 200 }
+        occurred_at: { $ref: '#/components/schemas/OccurredAt' }
+        contact_name: { type: string, minLength: 1, maxLength: 100 }
+        contact_info: { type: string, minLength: 1, maxLength: 200 }
+        image_key:
+          oneOf:
+            - $ref: '#/components/schemas/ImageKey'
+            - type: 'null'
+        status:
+          $ref: '#/components/schemas/ItemStatus'
+          default: open
+      example:
+        type: lost
+        title: Black leather wallet
+        description: Contains ID card and a few bank cards.
+        category: wallet
+        location: Central Library, 2nd floor
+        occurred_at: '2026-10-21T09:30:00+07:00'
+        contact_name: Rina
+        contact_info: rina@example.com
+
+    UpdateItem:
+      type: object
+      minProperties: 1
+      description: Any subset of the fields. Text fields are trimmed; required text cannot be blank.
+      properties:
+        type: { $ref: '#/components/schemas/ItemType' }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 2000 }
+        category: { $ref: '#/components/schemas/Category' }
+        location: { type: string, minLength: 1, maxLength: 200 }
+        occurred_at: { $ref: '#/components/schemas/OccurredAt' }
+        contact_name: { type: string, minLength: 1, maxLength: 100 }
+        contact_info: { type: string, minLength: 1, maxLength: 200 }
+        image_key:
+          description: '`null` removes the photo.'
+          oneOf:
+            - $ref: '#/components/schemas/ImageKey'
+            - type: 'null'
+        status: { $ref: '#/components/schemas/ItemStatus' }
+        resolved_by:
+          type: string
+          maxLength: 100
+          description: Only allowed together with `status` `resolved`. Empty clears it.
+        resolution_note:
+          type: string
+          maxLength: 500
+          description: Only allowed together with `status` `resolved`. Empty clears it.
+
+    ItemPage:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Item' }
+        meta:
+          type: object
+          required: [page, limit, total]
+          properties:
+            page: { type: integer }
+            limit: { type: integer }
+            total: { type: integer, description: Matching items across all pages. }
+
+    UploadedImage:
+      type: object
+      required: [key, url]
+      properties:
+        key: { $ref: '#/components/schemas/ImageKey' }
+        url: { type: string, description: URL for an immediate preview. }
+
+    Stats:
+      type: object
+      required: [total, open, resolved, lost, found, byCategory]
+      properties:
+        total: { type: integer }
+        open: { type: integer }
+        resolved: { type: integer }
+        lost: { type: integer }
+        found: { type: integer }
+        byCategory:
+          type: array
+          items:
+            type: object
+            required: [category, count]
+            properties:
+              category: { $ref: '#/components/schemas/Category' }
+              count: { type: integer }
+
+    Readiness:
+      type: object
+      required: [ok, checks]
+      properties:
+        ok: { type: boolean }
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [ok, unavailable]
+          examples:
+            - { database: ok, storage: ok }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        issues:
+          type: array
+          description: Per-field problems; only on validation errors.
+          items:
+            type: object
+            required: [message]
+            properties:
+              field: { type: string, description: JSON field or query parameter; absent for request-level problems. }
+              message: { type: string }
+
+  responses:
+    Error:
+      description: Bad request.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Validation failed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: Validation failed
+            issues:
+              - { field: title, message: Required }
+              - { field: occurred_at, message: 'Must be an ISO 8601 date-time with timezone, e.g. 2026-10-21T09:30:00Z' }
+    Unauthorized:
+      description: Missing, invalid or expired admin token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: Item not found }
+    TooLarge:
+      description: Request body too large.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    StorageUnavailable:
+      description: Image storage is unavailable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    InternalError:
+      description: Unexpected error (details are only logged).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
