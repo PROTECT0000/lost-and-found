@@ -10,10 +10,10 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
-import { Link as RouterLink } from 'react-router-dom'
-import type { Item, PaginationMeta } from '../../types/item'
+import type { Item, ItemFilters, PaginationMeta } from '../../types/item'
 import { PAGE_SIZE_OPTIONS, categoryLabel } from '../../constants/items'
 import { formatDate, formatDateTime } from '../../utils/format'
+import SortableHeaderCell from '../items/SortableHeaderCell'
 import StatusChip from '../items/StatusChip'
 import TypeChip from '../items/TypeChip'
 import ItemRowActions from './ItemRowActions'
@@ -21,8 +21,12 @@ import ItemRowActions from './ItemRowActions'
 interface ItemsTableProps {
   items: Item[]
   meta: PaginationMeta
+  filters: ItemFilters
   loading?: boolean
   busy?: boolean
+  onSort: (change: Pick<ItemFilters, 'sort' | 'order'>) => void
+  onView: (item: Item) => void
+  onEdit: (item: Item) => void
   onPageChange: (page: number) => void
   onRowsPerPageChange: (limit: number) => void
   onToggleStatus: (item: Item) => void
@@ -32,26 +36,31 @@ interface ItemsTableProps {
 export default function ItemsTable({
   items,
   meta,
+  filters,
   loading,
   busy,
+  onSort,
+  onView,
+  onEdit,
   onPageChange,
   onRowsPerPageChange,
   onToggleStatus,
   onDelete,
 }: ItemsTableProps) {
+  const sortProps = { filters, onSort }
   return (
     <Paper variant="outlined">
       <TableContainer>
         <Table size="small" sx={{ minWidth: 900, opacity: loading ? 0.5 : 1 }}>
           <TableHead>
             <TableRow>
-              <TableCell>Title</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Category</TableCell>
-              <TableCell>Location</TableCell>
-              <TableCell>Lost / found on</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Reported</TableCell>
+              <SortableHeaderCell field="title" label="Title" {...sortProps} />
+              <SortableHeaderCell field="type" label="Type" {...sortProps} />
+              <SortableHeaderCell field="category" label="Category" {...sortProps} />
+              <SortableHeaderCell field="location" label="Location" {...sortProps} />
+              <SortableHeaderCell field="occurred_at" label="Lost / found on" {...sortProps} />
+              <SortableHeaderCell field="status" label="Status" {...sortProps} />
+              <SortableHeaderCell field="created_at" label="Reported" {...sortProps} />
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -59,7 +68,14 @@ export default function ItemsTable({
             {items.map((item) => (
               <TableRow key={item.id} hover>
                 <TableCell sx={{ maxWidth: 220 }}>
-                  <Link component={RouterLink} to={`/items/${item.id}`} underline="hover" noWrap sx={{ display: 'block' }}>
+                  <Link
+                    component="button"
+                    type="button"
+                    onClick={() => onView(item)}
+                    underline="hover"
+                    noWrap
+                    sx={{ display: 'block', maxWidth: '100%', textAlign: 'left' }}
+                  >
                     {item.title}
                   </Link>
                   <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
@@ -81,7 +97,14 @@ export default function ItemsTable({
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(item.created_at)}</TableCell>
                 <TableCell align="right">
-                  <ItemRowActions item={item} disabled={busy} onToggleStatus={onToggleStatus} onDelete={onDelete} />
+                  <ItemRowActions
+                    item={item}
+                    disabled={busy}
+                    onView={onView}
+                    onEdit={onEdit}
+                    onToggleStatus={onToggleStatus}
+                    onDelete={onDelete}
+                  />
                 </TableCell>
               </TableRow>
             ))}

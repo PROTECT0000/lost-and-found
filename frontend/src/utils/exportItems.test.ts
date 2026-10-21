@@ -1,7 +1,14 @@
 import dayjs from 'dayjs'
 import { describe, expect, it } from 'vitest'
 import type { Item } from '../types/item'
-import { EXPORT_COLUMNS, describeFilters, exportFileName, toExcelLocalDate } from './exportItems'
+import {
+  EXPORT_COLUMNS,
+  describeReported,
+  exportFileName,
+  filterDetails,
+  summarizeItems,
+  toExcelLocalDate,
+} from './exportItems'
 
 const item: Item = {
   id: '1',
@@ -48,15 +55,53 @@ describe('toExcelLocalDate', () => {
   })
 })
 
-describe('describeFilters', () => {
-  it('summarises active filters', () => {
-    expect(describeFilters({ type: 'found', category: 'keys', status: 'resolved', q: 'car' })).toBe(
-      'Type: Found · Category: Keys · Status: Resolved · Search: "car"',
-    )
+describe('filterDetails', () => {
+  it('lists every filter, with "All" for the unset ones and the default sort', () => {
+    expect(filterDetails({})).toEqual([
+      { label: 'Type', value: 'All' },
+      { label: 'Category', value: 'All' },
+      { label: 'Status', value: 'All' },
+      { label: 'Search', value: 'None' },
+      { label: 'Reported', value: 'Any date' },
+      { label: 'Sorted by', value: 'Reported, descending' },
+    ])
   })
 
-  it('says "All items" without filters', () => {
-    expect(describeFilters({})).toBe('All items')
+  it('describes active filters', () => {
+    const details = filterDetails({ type: 'found', category: 'keys', status: 'resolved', q: 'car', sort: 'title', order: 'asc' })
+    expect(details.map((d) => d.value)).toEqual(['Found', 'Keys', 'Resolved', '"car"', 'Any date', 'Title, ascending'])
+  })
+})
+
+describe('describeReported', () => {
+  // `to` is exclusive: the start of the day after the last day.
+  it('shows whole days', () => {
+    const from = '2026-10-01T00:00:00+07:00'
+    const to = '2026-11-01T00:00:00+07:00'
+    expect(describeReported({ from, to })).toBe('01 Oct 2026 – 31 Oct 2026')
+    expect(describeReported({ from, to: '2026-10-02T00:00:00+07:00' })).toBe('01 Oct 2026')
+    expect(describeReported({ from })).toBe('From 01 Oct 2026')
+    expect(describeReported({ to })).toBe('Until 31 Oct 2026')
+    expect(describeReported({})).toBeUndefined()
+  })
+})
+
+describe('summarizeItems', () => {
+  it('counts the exported items by status, type and category', () => {
+    const s = summarizeItems([
+      item,
+      { ...item, id: '2', status: 'resolved' },
+      { ...item, id: '3', type: 'found', category: 'keys' },
+    ])
+    expect(s).toMatchObject({ total: 3, open: 2, resolved: 1, lost: 2, found: 1 })
+    expect(s.byCategory.map((c) => [c.category, c.count])).toEqual([
+      ['wallet', 2],
+      ['keys', 1],
+    ])
+    expect(s.byType).toEqual([
+      { type: 'lost', label: 'Lost', open: 1, resolved: 1 },
+      { type: 'found', label: 'Found', open: 1, resolved: 0 },
+    ])
   })
 })
 

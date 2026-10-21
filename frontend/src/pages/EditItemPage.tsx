@@ -4,22 +4,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useItemStore } from '../store/useItemStore'
 import { useSnackbarStore } from '../store/useSnackbarStore'
 import { getErrorMessage } from '../api/client'
-import type { Item, ItemInput } from '../types/item'
+import type { ItemInput } from '../types/item'
 import BackButton from '../components/common/BackButton'
 import ErrorState from '../components/common/ErrorState'
 import PageHeader from '../components/common/PageHeader'
 import ItemForm from '../components/items/form/ItemForm'
-
-const toInput = ({
-  id: _id,
-  image_url: _i,
-  created_at: _c,
-  updated_at: _u,
-  resolved_by: _rb,
-  resolution_note: _rn,
-  resolved_at: _ra,
-  ...input
-}: Item): ItemInput => input
+import { itemImage, itemToInput } from '../components/items/form/itemFormValidation'
 
 export default function EditItemPage() {
   const { id = '' } = useParams()
@@ -50,8 +40,8 @@ export default function EditItemPage() {
       {item && item.id === id && (
         <ItemForm
           key={item.id}
-          initialValues={toInput(item)}
-          initialImage={item.image_key && item.image_url ? { key: item.image_key, url: item.image_url } : null}
+          initialValues={itemToInput(item)}
+          initialImage={itemImage(item)}
           submitLabel="Save changes"
           submitting={saving}
           onSubmit={handleSubmit}

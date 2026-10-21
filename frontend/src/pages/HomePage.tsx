@@ -13,11 +13,23 @@ import ViewModeToggle from '../components/items/ViewModeToggle'
 import ItemsPagination from '../components/items/ItemsPagination'
 
 export default function HomePage() {
-  const { items, meta, filters, loading, error, setFilters, resetFilters, refresh, viewMode, setViewMode } =
-    useItemList()
+  const { items, meta, filters, loading, error, setFilters, refresh, viewMode, setViewMode } = useItemList()
 
-  const renderContent = () => {
-    if (error) return <ErrorState message={error} onRetry={refresh} />
+  // Like the admin dashboard, the table stays on screen while a page loads and carries its own
+  // sortable headers and pagination.
+  const renderTable = () => (
+    <ItemTable
+      items={items}
+      meta={meta}
+      filters={filters}
+      loading={loading}
+      onSort={setFilters}
+      onPageChange={(page) => setFilters({ page })}
+      onRowsPerPageChange={(limit) => setFilters({ limit })}
+    />
+  )
+
+  const renderCards = () => {
     if (loading) return <LoadingState />
     if (items.length === 0) {
       return (
@@ -32,7 +44,16 @@ export default function HomePage() {
         />
       )
     }
-    return viewMode === 'table' ? <ItemTable items={items} /> : <ItemGrid items={items} />
+    return (
+      <>
+        <ItemGrid items={items} />
+        <ItemsPagination
+          meta={meta}
+          onPageChange={(page) => setFilters({ page })}
+          onPageSizeChange={(limit) => setFilters({ limit })}
+        />
+      </>
+    )
   }
 
   return (
@@ -48,15 +69,8 @@ export default function HomePage() {
           </Stack>
         }
       />
-      <ItemFilters filters={filters} onChange={setFilters} onReset={resetFilters} />
-      {renderContent()}
-      {!loading && !error && (
-        <ItemsPagination
-          meta={meta}
-          onPageChange={(page) => setFilters({ page })}
-          onPageSizeChange={(limit) => setFilters({ limit })}
-        />
-      )}
+      <ItemFilters filters={filters} onChange={setFilters} />
+      {error ? <ErrorState message={error} onRetry={refresh} /> : viewMode === 'table' ? renderTable() : renderCards()}
     </>
   )
 }

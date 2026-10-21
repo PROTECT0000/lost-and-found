@@ -226,9 +226,42 @@ func ParseItemFilter(q url.Values) (model.ItemFilter, []Issue) {
 		f.Category = &c
 	}
 	f.Query = v.text("q", q.Get("q"), false, maxQuery)
+	f.ReportedFrom = v.optionalTime("from", q.Get("from"))
+	f.ReportedTo = v.optionalTime("to", q.Get("to"))
+	if f.ReportedFrom != nil && f.ReportedTo != nil && !f.ReportedTo.After(*f.ReportedFrom) {
+		v.add("to", `Must be after "from"`)
+	}
+	f.Sort = model.SortCreatedAt
+	if s := q.Get("sort"); s != "" {
+		f.Sort = model.SortField(s)
+		if !f.Sort.Valid() {
+			v.add("sort", "Unknown sort column")
+		}
+	}
+	switch q.Get("order") {
+	case "", "desc":
+	case "asc":
+		f.Asc = true
+	default:
+		v.add("order", `Must be "asc" or "desc"`)
+	}
 	f.Page = v.intParam("page", q.Get("page"), 1, 1, 0)
 	f.Limit = v.intParam("limit", q.Get("limit"), defaultLimit, 1, maxLimit)
 	return f, v.issues
+}
+
+// optionalTime parses an RFC 3339 timestamp with a timezone; "" means not set.
+func (v *validator) optionalTime(field, s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		v.add(field, "Must be an ISO 8601 date-time with timezone, e.g. 2026-10-01T00:00:00+07:00")
+		return nil
+	}
+	t = t.UTC()
+	return &t
 }
 
 // intParam parses an integer query parameter; max 0 means no upper bound.

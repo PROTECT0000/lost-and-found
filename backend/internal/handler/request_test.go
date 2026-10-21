@@ -164,6 +164,16 @@ func TestParseItemFilter(t *testing.T) {
 	if len(issues) > 0 || f.Page != 3 || f.Limit != 24 || *f.Type != model.ItemTypeFound || f.Query != "keys" {
 		t.Fatalf("parsed: %+v %+v", f, issues)
 	}
+	if f.Sort != model.SortCreatedAt || f.Asc {
+		t.Errorf("default sort = %q asc=%v, want created_at desc", f.Sort, f.Asc)
+	}
+	if f, _ := handler.ParseItemFilter(url.Values{"sort": {"title"}, "order": {"asc"}}); f.Sort != model.SortTitle || !f.Asc {
+		t.Errorf("sort=title&order=asc parsed as %q asc=%v", f.Sort, f.Asc)
+	}
+	if f, issues := handler.ParseItemFilter(url.Values{"from": {"2026-10-01T00:00:00+07:00"}}); len(issues) > 0 ||
+		f.ReportedFrom == nil || !f.ReportedFrom.Equal(time.Date(2026, 9, 30, 17, 0, 0, 0, time.UTC)) || f.ReportedTo != nil {
+		t.Errorf("from parsed as %v / %v (%+v)", f.ReportedFrom, f.ReportedTo, issues)
+	}
 	if f.Offset() != 48 {
 		t.Errorf("Offset() = %d, want 48", f.Offset())
 	}
@@ -171,6 +181,8 @@ func TestParseItemFilter(t *testing.T) {
 	for _, q := range []url.Values{
 		{"page": {"0"}}, {"page": {"1.5"}}, {"page": {"abc"}}, {"limit": {"0"}}, {"limit": {"101"}},
 		{"type": {"stolen"}}, {"status": {"closed"}}, {"category": {"cars"}},
+		{"sort": {"contact_info"}}, {"sort": {"title; DROP TABLE items"}}, {"order": {"up"}},
+		{"from": {"2026-10-01"}}, {"from": {"2026-10-02T00:00:00Z"}, "to": {"2026-10-01T00:00:00Z"}},
 	} {
 		if _, issues := handler.ParseItemFilter(q); len(issues) == 0 {
 			t.Errorf("%v: expected a validation issue", q)

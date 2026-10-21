@@ -1,13 +1,20 @@
 import dayjs from 'dayjs'
-import type { Item, ItemFilters } from '../types/item'
-import { ITEM_STATUS_OPTIONS, ITEM_TYPE_OPTIONS, categoryLabel } from '../constants/items'
+import type { Item, ItemCategory, ItemFilters, SortField } from '../types/item'
+import {
+  CATEGORY_COLORS,
+  ITEM_CATEGORY_OPTIONS,
+  ITEM_STATUS_OPTIONS,
+  ITEM_TYPE_OPTIONS,
+  categoryLabel,
+} from '../constants/items'
 import { formatDateTime, parseServerDate } from './format'
+import { activeSort } from './itemQuery'
 
 // Exports are built entirely in the browser and never include images. The libraries are
 // imported on demand so they are only downloaded when someone actually exports.
 
 export type ExportFormat = 'xlsx' | 'pdf'
-type ExportFilters = Omit<ItemFilters, 'page' | 'limit'>
+export type ExportFilters = Omit<ItemFilters, 'page' | 'limit'>
 
 const label = <T extends string>(value: T, options: { value: T; label: string }[]) =>
   options.find((o) => o.value === value)?.label ?? value
@@ -34,15 +41,73 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { header: 'Reported', width: 18, text: (i) => formatDateTime(i.created_at), date: (i) => i.created_at },
 ]
 
-/** Human-readable summary of the active filters, printed at the top of the export. */
-export function describeFilters(filters: ExportFilters): string {
-  const parts = [
-    filters.type && `Type: ${label(filters.type, ITEM_TYPE_OPTIONS)}`,
-    filters.category && `Category: ${categoryLabel(filters.category)}`,
-    filters.status && `Status: ${label(filters.status, ITEM_STATUS_OPTIONS)}`,
-    filters.q && `Search: "${filters.q}"`,
-  ].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'All items'
+const SORT_LABELS: Record<SortField, string> = {
+  created_at: 'Reported',
+  occurred_at: 'Lost / found on',
+  title: 'Title',
+  type: 'Type',
+  category: 'Category',
+  location: 'Location',
+  status: 'Status',
+}
+
+/** The reported date range as dates; `to` is exclusive, so the last day shown is the day before. */
+export function describeReported(filters: Pick<ExportFilters, 'from' | 'to'>): string | undefined {
+  const from = filters.from && dayjs(filters.from).format('DD MMM YYYY')
+  const to = filters.to && dayjs(filters.to).subtract(1, 'millisecond').format('DD MMM YYYY')
+  if (from && to) return from === to ? from : `${from} – ${to}`
+  if (from) return `From ${from}`
+  if (to) return `Until ${to}`
+  return undefined
+}
+
+/** Every filter of an export with its value ("All" when not set), for the export's header. */
+export function filterDetails(filters: ExportFilters): { label: string; value: string }[] {
+  const sort = activeSort({ ...filters, page: 1, limit: 1 })
+  return [
+    { label: 'Type', value: filters.type ? label(filters.type, ITEM_TYPE_OPTIONS) : 'All' },
+    { label: 'Category', value: filters.category ? categoryLabel(filters.category) : 'All' },
+    { label: 'Status', value: filters.status ? label(filters.status, ITEM_STATUS_OPTIONS) : 'All' },
+    { label: 'Search', value: filters.q ? `"${filters.q}"` : 'None' },
+    { label: 'Reported', value: describeReported(filters) ?? 'Any date' },
+    { label: 'Sorted by', value: `${SORT_LABELS[sort.field]}, ${sort.order === 'asc' ? 'ascending' : 'descending'}` },
+  ]
+}
+
+export interface ExportSummary {
+  total: number
+  open: number
+  resolved: number
+  lost: number
+  found: number
+  /** Categories with at least one item, in the fixed category order. */
+  byCategory: { category: ItemCategory; label: string; count: number; color: string }[]
+  /** Open and resolved counts for each type. */
+  byType: { type: 'lost' | 'found'; label: string; open: number; resolved: number }[]
+}
+
+/** Totals for the exported items, so the summary always matches the rows. */
+export function summarizeItems(items: Item[]): ExportSummary {
+  const count = (pred: (i: Item) => boolean) => items.filter(pred).length
+  return {
+    total: items.length,
+    open: count((i) => i.status === 'open'),
+    resolved: count((i) => i.status === 'resolved'),
+    lost: count((i) => i.type === 'lost'),
+    found: count((i) => i.type === 'found'),
+    byCategory: ITEM_CATEGORY_OPTIONS.map((o) => ({
+      category: o.value,
+      label: o.label,
+      count: count((i) => i.category === o.value),
+      color: CATEGORY_COLORS[o.value],
+    })).filter((c) => c.count > 0),
+    byType: ITEM_TYPE_OPTIONS.map((o) => ({
+      type: o.value,
+      label: o.label,
+      open: count((i) => i.type === o.value && i.status === 'open'),
+      resolved: count((i) => i.type === o.value && i.status === 'resolved'),
+    })),
+  }
 }
 
 export const exportFileName = (format: ExportFormat, now = dayjs()) =>
@@ -73,11 +138,24 @@ async function toExcel(items: Item[], filters: ExportFilters, now: dayjs.Dayjs) 
         : { value: c.text(item), type: String, wrap: c.header === 'Description' },
     ),
   )
+  const summary = summarizeItems(items)
+  const bold = (value: string) => ({ value, fontWeight: 'bold' as const })
   const info = [
-    ['Lost & Found items'].map((value) => ({ value, fontWeight: 'bold' as const })),
-    ['Filters', describeFilters(filters)],
-    ['Items', items.length],
+    [bold('Lost & Found items')],
     ['Generated', now.format('DD MMM YYYY, HH:mm')],
+    [],
+    [bold('Filters')],
+    ...filterDetails(filters).map((d) => [d.label, d.value]),
+    [],
+    [bold('Summary')],
+    ['Items', summary.total],
+    ['Open', summary.open],
+    ['Resolved', summary.resolved],
+    ['Lost', summary.lost],
+    ['Found', summary.found],
+    [],
+    [bold('By category')],
+    ...summary.byCategory.map((c) => [c.label, c.count]),
   ]
   await writeXlsxFile([
     {
@@ -86,40 +164,52 @@ async function toExcel(items: Item[], filters: ExportFilters, now: dayjs.Dayjs) 
       columns: EXPORT_COLUMNS.map((c) => ({ width: c.width })),
       stickyRowsCount: 1,
     },
-    { sheet: 'Export info', data: info, columns: [{ width: 12 }, { width: 60 }] },
+    { sheet: 'Summary', data: info, columns: [{ width: 14 }, { width: 50 }] },
   ]).toFile(exportFileName('xlsx', now))
 }
 
 async function toPdf(items: Item[], filters: ExportFilters, now: dayjs.Dayjs) {
-  const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
+  const [{ jsPDF }, { autoTable }, { drawSummaryPage }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+    import('./exportPdfSummary'),
+  ])
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
   const margin = 32
 
-  doc.setFontSize(16)
-  doc.text('Lost & Found items', margin, margin + 8)
-  doc.setFontSize(9)
-  doc.setTextColor(100)
-  doc.text(
-    `${describeFilters(filters)}  ·  ${items.length} item${items.length === 1 ? '' : 's'}  ·  Generated ${now.format('DD MMM YYYY, HH:mm')}`,
+  // Page 1: what was exported (filters) and charts of it; the item table starts on page 2.
+  drawSummaryPage(doc, {
     margin,
-    margin + 24,
-  )
-
-  autoTable(doc, {
-    startY: margin + 36,
-    margin: { left: margin, right: margin, bottom: margin + 8 },
-    head: [EXPORT_COLUMNS.map((c) => c.header)],
-    body: items.map((item) => EXPORT_COLUMNS.map((c) => c.text(item))),
-    styles: { fontSize: 7.5, cellPadding: 3, overflow: 'linebreak', valign: 'top' },
-    headStyles: { fillColor: [25, 118, 210], textColor: 255, fontStyle: 'bold' },
-    columnStyles: Object.fromEntries(EXPORT_COLUMNS.map((c, i) => [i, { cellWidth: c.header === 'Description' ? 140 : 'auto' }])),
-    didDrawPage: () => {
-      const { width, height } = doc.internal.pageSize
-      doc.setFontSize(8)
-      doc.setTextColor(120)
-      doc.text(`Page ${doc.getNumberOfPages()}`, width - margin, height - margin / 2, { align: 'right' })
-    },
+    generated: now.format('DD MMM YYYY, HH:mm'),
+    details: filterDetails(filters),
+    summary: summarizeItems(items),
   })
+
+  if (items.length > 0) {
+    doc.addPage()
+    autoTable(doc, {
+      startY: margin,
+      margin: { top: margin, left: margin, right: margin, bottom: margin + 8 },
+      head: [EXPORT_COLUMNS.map((c) => c.header)],
+      body: items.map((item) => EXPORT_COLUMNS.map((c) => c.text(item))),
+      styles: { fontSize: 7.5, cellPadding: 3, overflow: 'linebreak', valign: 'top' },
+      headStyles: { fillColor: [25, 118, 210], textColor: 255, fontStyle: 'bold' },
+      columnStyles: Object.fromEntries(
+        EXPORT_COLUMNS.map((c, i) => [i, { cellWidth: c.header === 'Description' ? 140 : 'auto' }]),
+      ),
+    })
+  }
+
+  const pages = doc.getNumberOfPages()
+  const { width, height } = doc.internal.pageSize
+  for (let page = 1; page <= pages; page++) {
+    doc.setPage(page)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(120)
+    doc.text('Lost & Found items', margin, height - margin / 2)
+    doc.text(`Page ${page} of ${pages}`, width - margin, height - margin / 2, { align: 'right' })
+  }
 
   doc.save(exportFileName('pdf', now))
 }

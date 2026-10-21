@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import type { ItemInput } from '../../../types/item'
+import type { Item, ItemInput, UploadedImage } from '../../../types/item'
 
 export type ItemFormErrors = Partial<Record<keyof ItemInput, string>>
 
@@ -15,6 +15,22 @@ export const createEmptyItemInput = (): ItemInput => ({
   image_key: null,
   status: 'open',
 })
+
+/** The editable fields of an existing item, as the form's initial values. */
+export const itemToInput = ({
+  id: _id,
+  image_url: _i,
+  created_at: _c,
+  updated_at: _u,
+  resolved_by: _rb,
+  resolution_note: _rn,
+  resolved_at: _ra,
+  ...input
+}: Item): ItemInput => input
+
+/** The item's current photo, as the form's initial image. */
+export const itemImage = (item: Item): UploadedImage | null =>
+  item.image_key && item.image_url ? { key: item.image_key, url: item.image_url } : null
 
 export function validateItemInput(values: ItemInput, now = dayjs()): ItemFormErrors {
   const errors: ItemFormErrors = {}

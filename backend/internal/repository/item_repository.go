@@ -41,7 +41,7 @@ func (r *ItemRepository) List(ctx context.Context, f model.ItemFilter) ([]model.
 	}
 
 	items := []model.Item{}
-	query := "SELECT " + itemColumns + " FROM items" + where + " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
+	query := "SELECT " + itemColumns + " FROM items" + where + buildItemOrder(f) + " LIMIT ? OFFSET ?"
 	if err := r.db.SelectContext(ctx, &items, query, append(args, f.Limit, f.Offset())...); err != nil {
 		return nil, 0, fmt.Errorf("list items: %w", err)
 	}
@@ -65,6 +65,14 @@ func buildItemWhere(f model.ItemFilter) (string, []any) {
 		conds = append(conds, "category = ?")
 		args = append(args, *f.Category)
 	}
+	if f.ReportedFrom != nil {
+		conds = append(conds, "created_at >= ?")
+		args = append(args, *f.ReportedFrom)
+	}
+	if f.ReportedTo != nil {
+		conds = append(conds, "created_at < ?")
+		args = append(args, *f.ReportedTo)
+	}
 	if f.Query != "" {
 		like := "%" + escapeLike(f.Query) + "%"
 		conds = append(conds, "(title LIKE ? ESCAPE '!' OR description LIKE ? ESCAPE '!' OR location LIKE ? ESCAPE '!')")
@@ -74,6 +82,20 @@ func buildItemWhere(f model.ItemFilter) (string, []any) {
 		return "", args
 	}
 	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+// buildItemOrder builds the ORDER BY clause. The column comes from the model.SortField allow-list;
+// id breaks ties so pages never overlap or skip rows.
+func buildItemOrder(f model.ItemFilter) string {
+	column := model.SortCreatedAt
+	if f.Sort.Valid() {
+		column = f.Sort
+	}
+	dir := " DESC"
+	if f.Asc {
+		dir = " ASC"
+	}
+	return " ORDER BY " + string(column) + dir + ", id" + dir
 }
 
 // escapeLike escapes LIKE wildcards so the search term matches literally.

@@ -70,7 +70,11 @@ Visitors can browse and report items. Editing, resolving and deleting are admin-
 
 - Log in at `/admin/login` with `ADMIN_PASSWORD` (sessions last 8 hours).
 - `/admin` shows stats (totals, open/resolved, lost/found, by category) and a table of all items with quick actions.
-- **Export** on `/admin` downloads every item matching the current filters (all pages) as Excel (`.xlsx`) or PDF.
+- **Export** on `/admin` opens a dialog that starts from the dashboard's filters; type, category, status,
+  search and a "reported between" date range can be changed there, with a live count of matching items. It
+  downloads every matching item (all pages) as Excel (`.xlsx`, plus a Summary sheet with the filters and counts)
+  or PDF. The PDF opens with a summary page: the filters used, totals, a category donut and lost/found by
+  status, drawn as vector graphics; the item table follows.
   Files are built in the browser (`write-excel-file`, `jsPDF`); images are not included.
 
 Lists are paginated (12, 24 or 48 per page). Filters, page and page size are kept in the URL
@@ -87,7 +91,7 @@ Full reference: [`backend/api/openapi.yaml`](backend/api/openapi.yaml) (OpenAPI 
 | --- | --- | --- |
 | GET | `/api/health` | Liveness: the process is up |
 | GET | `/api/health/ready` | Readiness: MySQL and storage reachable (503 otherwise) |
-| GET | `/api/items` | List items. Query: `type` (lost/found), `status` (open/resolved), `category`, `q`, `page`, `limit` |
+| GET | `/api/items` | List items. Query: `type` (lost/found), `status` (open/resolved), `category`, `q`, `from`/`to` (reported between, RFC 3339), `sort` (created_at, occurred_at, title, type, category, location, status), `order` (asc/desc, default desc), `page`, `limit` |
 | GET | `/api/items/:id` | Get one item |
 | POST | `/api/items` | Create item |
 | PATCH | `/api/items/:id` | 🔒 Partially update item; `resolved_by`/`resolution_note` are accepted with `status: "resolved"`, and reopening clears them |

@@ -1,8 +1,11 @@
-import { Grid } from '@mui/material'
+import { lazy, Suspense } from 'react'
+import { Grid, Skeleton } from '@mui/material'
 import { MdCheckCircle, MdInventory2, MdReportProblem, MdSchedule, MdVolunteerActivism } from 'react-icons/md'
 import type { AdminStats } from '../../types/admin'
 import StatCard from './StatCard'
-import CategoryBreakdown from './CategoryBreakdown'
+
+// The chart library is only needed here, so it is downloaded with the dashboard, not the public pages.
+const CategoryBreakdown = lazy(() => import('./CategoryBreakdown'))
 
 export default function StatsOverview({ stats }: { stats: AdminStats | null }) {
   const cards = [
@@ -24,7 +27,13 @@ export default function StatsOverview({ stats }: { stats: AdminStats | null }) {
           ))}
         </Grid>
       </Grid>
-      <Grid size={{ xs: 12, md: 5 }}>{stats && <CategoryBreakdown stats={stats} />}</Grid>
+      <Grid size={{ xs: 12, md: 5 }}>
+        {stats && (
+          <Suspense fallback={<Skeleton variant="rounded" height="100%" sx={{ minHeight: 240 }} />}>
+            <CategoryBreakdown stats={stats} />
+          </Suspense>
+        )}
+      </Grid>
     </Grid>
   )
 }

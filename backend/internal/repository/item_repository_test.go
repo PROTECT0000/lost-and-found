@@ -348,3 +348,37 @@ func TestResolveAndReopenTracksResolution(t *testing.T) {
 		t.Errorf("reopen kept resolution: %+v", reopened)
 	}
 }
+
+func TestListSorts(t *testing.T) {
+	r := newRepo(t)
+	for _, title := range []string{"Banana", "Apple", "Cherry"} {
+		mustCreate(t, r, func(in *model.NewItem) { in.Title = title })
+	}
+	if items, _ := list(t, r, model.ItemFilter{Sort: model.SortTitle, Asc: true}); titles(items) != "Apple,Banana,Cherry" {
+		t.Errorf("title asc = %s", titles(items))
+	}
+	if items, _ := list(t, r, model.ItemFilter{Sort: model.SortTitle}); titles(items) != "Cherry,Banana,Apple" {
+		t.Errorf("title desc = %s", titles(items))
+	}
+	// An unknown column falls back to the default order instead of reaching the SQL.
+	def, _ := list(t, r, model.ItemFilter{})
+	if items, _ := list(t, r, model.ItemFilter{Sort: "title; DROP TABLE items"}); titles(items) != titles(def) {
+		t.Errorf("fallback = %s, want %s", titles(items), titles(def))
+	}
+}
+
+func TestListReportedBetween(t *testing.T) {
+	r := newRepo(t)
+	seedThree(t, r)
+	if _, err := testDB.Exec("UPDATE items SET created_at = '2026-09-15 12:00:00' WHERE title = 'Keys'"); err != nil {
+		t.Fatal(err)
+	}
+	from := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	if items, total := list(t, r, model.ItemFilter{ReportedFrom: &from, ReportedTo: &to}); total != 1 || titles(items) != "Keys" {
+		t.Errorf("September: %d items %s", total, titles(items))
+	}
+	if _, total := list(t, r, model.ItemFilter{ReportedTo: &from}); total != 0 {
+		t.Errorf("before September: %d items, want 0", total)
+	}
+}

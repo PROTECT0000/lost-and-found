@@ -18,6 +18,8 @@ interface ItemFormProps {
   submitting?: boolean
   onSubmit: (values: ItemInput) => void
   onCancel: () => void
+  /** Render without the outlined card, e.g. inside a dialog. */
+  embedded?: boolean
 }
 
 /** Single-page form with every field, used for editing. */
@@ -28,6 +30,7 @@ export default function ItemForm({
   submitting = false,
   onSubmit,
   onCancel,
+  embedded = false,
 }: ItemFormProps) {
   const form = useItemForm(initialValues, initialImage)
 
@@ -36,8 +39,8 @@ export default function ItemForm({
     if (Object.keys(form.validate()).length === 0) onSubmit(form.getSubmitValues())
   }
 
-  return (
-    <Paper variant="outlined" component="form" noValidate onSubmit={handleSubmit} sx={{ p: { xs: 2, sm: 4 } }}>
+  const fields = (
+    <>
       <Stack spacing={4} divider={<Divider />}>
         <FormSection title="Details">
           <DetailsFields form={form} />
@@ -75,6 +78,19 @@ export default function ItemForm({
           {submitLabel}
         </Button>
       </Stack>
+    </>
+  )
+
+  if (embedded) {
+    return (
+      <form noValidate onSubmit={handleSubmit}>
+        {fields}
+      </form>
+    )
+  }
+  return (
+    <Paper variant="outlined" component="form" noValidate onSubmit={handleSubmit} sx={{ p: { xs: 2, sm: 4 } }}>
+      {fields}
     </Paper>
   )
 }

@@ -8,15 +8,23 @@ interface ItemActionsProps {
   busy?: boolean
   onToggleStatus: () => void
   onDelete: () => void
+  /** Edit in place (e.g. a dialog) instead of navigating to the edit page. */
+  onEdit?: () => void
 }
 
-export default function ItemActions({ item, busy, onToggleStatus, onDelete }: ItemActionsProps) {
+export default function ItemActions({ item, busy, onToggleStatus, onDelete, onEdit }: ItemActionsProps) {
   const resolved = item.status === 'resolved'
   return (
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-      <Button variant="outlined" startIcon={<MdEdit />} component={RouterLink} to={`/items/${item.id}/edit`}>
-        Edit
-      </Button>
+      {onEdit ? (
+        <Button variant="outlined" startIcon={<MdEdit />} onClick={onEdit} disabled={busy}>
+          Edit
+        </Button>
+      ) : (
+        <Button variant="outlined" startIcon={<MdEdit />} component={RouterLink} to={`/items/${item.id}/edit`}>
+          Edit
+        </Button>
+      )}
       <Button
         variant="contained"
         color={resolved ? 'secondary' : 'success'}

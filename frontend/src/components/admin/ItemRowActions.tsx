@@ -1,26 +1,27 @@
 import { IconButton, Stack, Tooltip } from '@mui/material'
-import { Link as RouterLink } from 'react-router-dom'
 import { MdCheckCircle, MdDelete, MdEdit, MdReplay, MdVisibility } from 'react-icons/md'
 import type { Item } from '../../types/item'
 
 interface ItemRowActionsProps {
   item: Item
   disabled?: boolean
+  onView: (item: Item) => void
+  onEdit: (item: Item) => void
   onToggleStatus: (item: Item) => void
   onDelete: (item: Item) => void
 }
 
-export default function ItemRowActions({ item, disabled, onToggleStatus, onDelete }: ItemRowActionsProps) {
+export default function ItemRowActions({ item, disabled, onView, onEdit, onToggleStatus, onDelete }: ItemRowActionsProps) {
   const resolved = item.status === 'resolved'
   return (
     <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end' }}>
       <Tooltip title="View">
-        <IconButton size="small" component={RouterLink} to={`/items/${item.id}`}>
+        <IconButton size="small" onClick={() => onView(item)}>
           <MdVisibility />
         </IconButton>
       </Tooltip>
       <Tooltip title="Edit">
-        <IconButton size="small" color="primary" component={RouterLink} to={`/items/${item.id}/edit`}>
+        <IconButton size="small" color="primary" onClick={() => onEdit(item)}>
           <MdEdit />
         </IconButton>
       </Tooltip>

@@ -34,7 +34,7 @@ paths:
     get:
       tags: [Items]
       summary: List items
-      description: One page of items matching the filters, newest first.
+      description: One page of items matching the filters, newest first unless `sort`/`order` say otherwise.
       operationId: listItems
       parameters:
         - name: type
@@ -50,6 +50,24 @@ paths:
           in: query
           description: Case-insensitive search in title, description and location.
           schema: { type: string, maxLength: 100 }
+        - name: from
+          in: query
+          description: Only items reported at or after this time (RFC 3339 with timezone).
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          description: Only items reported before this time (RFC 3339 with timezone). Must be after `from`.
+          schema: { type: string, format: date-time }
+        - name: sort
+          in: query
+          description: Column to order by.
+          schema:
+            type: string
+            enum: [created_at, occurred_at, title, type, category, location, status]
+            default: created_at
+        - name: order
+          in: query
+          schema: { type: string, enum: [asc, desc], default: desc }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }

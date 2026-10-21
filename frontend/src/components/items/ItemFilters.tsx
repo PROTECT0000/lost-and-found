@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, InputAdornment, Paper, Stack, TextField } from '@mui/material'
-import { MdClear, MdSearch } from 'react-icons/md'
+import { InputAdornment, Paper, Stack, TextField } from '@mui/material'
+import { MdSearch } from 'react-icons/md'
 import { ITEM_CATEGORY_OPTIONS, ITEM_STATUS_OPTIONS } from '../../constants/items'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import type { ItemFilters as Filters } from '../../types/item'
@@ -10,14 +10,13 @@ import ItemTypeToggle from './ItemTypeToggle'
 interface ItemFiltersProps {
   filters: Filters
   onChange: (change: Partial<Filters>, options?: { replace?: boolean }) => void
-  onReset: () => void
 }
 
-export default function ItemFilters({ filters, onChange: setFilters, onReset }: ItemFiltersProps) {
+export default function ItemFilters({ filters, onChange: setFilters }: ItemFiltersProps) {
   const [search, setSearch] = useState(filters.q ?? '')
   const debouncedSearch = useDebouncedValue(search)
 
-  // Follow the URL when it changes underneath us (back/forward, Clear), but leave the box alone
+  // Follow the URL when it changes underneath us (back/forward), but leave the box alone
   // when it already matches, so whitespace the user is still typing is kept.
   const [syncedQuery, setSyncedQuery] = useState(filters.q)
   if (filters.q !== syncedQuery) {
@@ -35,10 +34,6 @@ export default function ItemFilters({ filters, onChange: setFilters, onReset }: 
       setFilters({ q: debouncedSearch.trim() || undefined }, { replace: true })
     }
   }, [debouncedSearch, filters.q, setFilters])
-
-  // The Lost/All/Found toggle is always visible with its own "All" option, so it alone does not
-  // count as a filter to clear.
-  const hasFilters = Boolean(filters.status || filters.category || filters.q)
 
   return (
     <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
@@ -82,17 +77,6 @@ export default function ItemFilters({ filters, onChange: setFilters, onReset }: 
           onChange={(status) => setFilters({ status: status || undefined })}
           sx={{ minWidth: 150 }}
         />
-        {hasFilters && (
-          <Button
-            startIcon={<MdClear />}
-            onClick={() => {
-              setSearch('')
-              onReset()
-            }}
-          >
-            Clear
-          </Button>
-        )}
       </Stack>
     </Paper>
   )

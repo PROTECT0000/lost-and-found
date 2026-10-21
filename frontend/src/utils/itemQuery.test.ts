@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { itemFiltersToParams, parseItemFilters, parseViewMode, updateItemFilters } from './itemQuery'
+import {
+  activeSort,
+  itemFiltersToParams,
+  parseItemFilters,
+  parseViewMode,
+  sortChange,
+  updateItemFilters,
+} from './itemQuery'
 
 const parse = (query: string) => parseItemFilters(new URLSearchParams(query))
 
@@ -62,5 +69,25 @@ describe('parseViewMode', () => {
     expect(parseViewMode(new URLSearchParams(''))).toBe('card')
     expect(parseViewMode(new URLSearchParams('view=table'))).toBe('table')
     expect(parseViewMode(new URLSearchParams('view=list'))).toBe('card')
+  })
+})
+
+describe('sorting', () => {
+  const base = { page: 1, limit: 12 }
+
+  it('round-trips a sort through the URL and keeps defaults out of it', () => {
+    expect(parse('sort=title&order=asc')).toMatchObject({ sort: 'title', order: 'asc' })
+    expect(parse('sort=created_at&order=desc')).toEqual(base)
+    expect(parse('sort=contact_info&order=up')).toEqual(base)
+    expect(itemFiltersToParams({ ...base, sort: 'title', order: 'asc' }).toString()).toBe('sort=title&order=asc')
+  })
+
+  it('starts text columns A–Z and dates newest first, then flips the active column', () => {
+    expect(sortChange(base, 'title')).toEqual({ sort: 'title', order: 'asc' })
+    expect(sortChange(base, 'occurred_at')).toEqual({ sort: 'occurred_at', order: undefined })
+    expect(sortChange({ ...base, sort: 'title', order: 'asc' }, 'title')).toEqual({ sort: 'title', order: undefined })
+    // created_at descending is the default, so clicking it flips to oldest first.
+    expect(sortChange(base, 'created_at')).toEqual({ sort: undefined, order: 'asc' })
+    expect(activeSort(base)).toEqual({ field: 'created_at', order: 'desc' })
   })
 })

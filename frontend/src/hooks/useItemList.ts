@@ -26,11 +26,6 @@ export function useItemList() {
       }, options),
     [setSearchParams],
   )
-  // Clear only resets search, category and status; the Lost/Found toggle and page size stay.
-  const resetFilters = useCallback(
-    () => setFilters({ q: undefined, category: undefined, status: undefined }),
-    [setFilters],
-  )
   const setViewMode = useCallback(
     (mode: ViewMode) =>
       setSearchParams((prev) => {
@@ -54,5 +49,5 @@ export function useItemList() {
     if (pastEnd) setFilters({ page: lastPage }, { replace: true })
   }, [pastEnd, lastPage, setFilters])
 
-  return { items, meta, loading, error, filters, setFilters, resetFilters, refresh, viewMode, setViewMode }
+  return { items, meta, loading, error, filters, setFilters, refresh, viewMode, setViewMode }
 }

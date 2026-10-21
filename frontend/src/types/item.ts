@@ -52,11 +52,21 @@ export interface UploadedImage {
   url: string
 }
 
+export type SortField = 'created_at' | 'occurred_at' | 'title' | 'type' | 'category' | 'location' | 'status'
+export type SortOrder = 'asc' | 'desc'
+
 export interface ItemFilters {
   type?: ItemType
   status?: ItemStatus
   category?: ItemCategory
   q?: string
+  /** Column to order by; undefined means created_at (newest first). */
+  sort?: SortField
+  /** undefined means descending, the API default. */
+  order?: 'asc'
+  /** Reported at or after / before these ISO times. Only used by exports, never kept in the URL. */
+  from?: string
+  to?: string
   page: number
   limit: number
 }
