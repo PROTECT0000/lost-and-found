@@ -21,6 +21,7 @@ docker compose up -d --build
 | MinIO console (S3 API on `:9000`) | http://localhost:9001 (`devaccesskey` / `devsecretkey`) |
 | Prometheus | http://localhost:9090 |
 | Grafana, "Lost & Found" dashboard | http://localhost:3000 (`admin` / `admin`) |
+| phpMyAdmin (signed in to MySQL automatically) | http://localhost:8081 |
 
 MySQL (`localhost:3306`, `lostfound` / `lostfound`) is migrated automatically by the one-shot `migrate`
 service, and MinIO creates the `lost-and-found` bucket on startup. Load sample items with

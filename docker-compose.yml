@@ -1,10 +1,11 @@
-# Full local stack: MySQL, MinIO, backend, frontend, Prometheus and Grafana.
+# Full local stack: MySQL, phpMyAdmin, MinIO, backend, frontend, Prometheus and Grafana.
 #
 #   docker compose up -d --build            # build backend/frontend from source
 #   docker compose pull && docker compose up -d --no-build   # or run the images CI publishes
 #
 #   App            http://localhost:8080
 #   API            http://localhost:8787
+#   phpMyAdmin     http://localhost:8081   (signed in automatically as the app user)
 #   MinIO console  http://localhost:9001   (S3 API on :9000)
 #   Prometheus     http://localhost:9090
 #   Grafana        http://localhost:3000   (dashboard "Lost & Found")
@@ -34,6 +35,23 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
+    restart: unless-stopped
+
+  # Logs in automatically with the app's MySQL user (config auth), so it opens straight on the
+  # lost_and_found database. Local use only: anyone who can reach the port gets that access.
+  phpmyadmin:
+    image: phpmyadmin:5.2.2
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER:-lostfound}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-lostfound}
+      UPLOAD_LIMIT: 64M
+    ports:
+      - "8081:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
     restart: unless-stopped
 
   # MinIO no longer publishes official images; this is Bitnami's last free build (frozen,
