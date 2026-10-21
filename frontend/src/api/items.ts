@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Item, ItemFilters, ItemInput, Paginated } from '../types/item'
+import type { Item, ItemFilters, ItemInput, ItemUpdate, Paginated } from '../types/item'
 
 /** Largest page the API serves (maxLimit in the backend). */
 const MAX_PAGE_SIZE = 100
@@ -19,7 +19,7 @@ export const itemsApi = {
   },
   get: (id: string) => apiClient.get<Item>(`/items/${id}`).then((r) => r.data),
   create: (input: ItemInput) => apiClient.post<Item>('/items', input).then((r) => r.data),
-  update: (id: string, input: Partial<ItemInput>) =>
+  update: (id: string, input: ItemUpdate) =>
     apiClient.patch<Item>(`/items/${id}`, input).then((r) => r.data),
   remove: (id: string) => apiClient.delete(`/items/${id}`),
 }

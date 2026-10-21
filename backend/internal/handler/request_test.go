@@ -177,3 +177,31 @@ func TestParseItemFilter(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateResolutionDetails(t *testing.T) {
+	changes, issues := decodeUpdate(t, `{"status": "resolved", "resolved_by": "  Andi  ", "resolution_note": ""}`).Validate()
+	if len(issues) > 0 {
+		t.Fatalf("unexpected issues: %+v", issues)
+	}
+	if !changes.ResolvedBy.Set || changes.ResolvedBy.Value == nil || *changes.ResolvedBy.Value != "Andi" {
+		t.Errorf("resolved_by = %+v, want trimmed Andi", changes.ResolvedBy)
+	}
+	if !changes.ResolutionNote.Set || changes.ResolutionNote.Value != nil {
+		t.Errorf("empty resolution_note = %+v, want set to nil", changes.ResolutionNote)
+	}
+}
+
+func TestUpdateResolutionDetailsRequireResolvedStatus(t *testing.T) {
+	for _, body := range []string{
+		`{"resolved_by": "Andi"}`,
+		`{"status": "open", "resolution_note": "Picked up"}`,
+	} {
+		if _, issues := decodeUpdate(t, body).Validate(); len(issues) != 1 {
+			t.Errorf("%s: issues = %+v, want one", body, issues)
+		}
+	}
+	long := strings.Repeat("a", 101)
+	if _, issues := decodeUpdate(t, `{"status": "resolved", "resolved_by": "`+long+`"}`).Validate(); len(issues) != 1 {
+		t.Errorf("over-long resolved_by: issues = %+v, want one", issues)
+	}
+}

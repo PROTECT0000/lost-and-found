@@ -10,6 +10,7 @@ import type { Item } from '../types/item'
 import PageHeader from '../components/common/PageHeader'
 import ErrorState from '../components/common/ErrorState'
 import ConfirmDialog from '../components/common/ConfirmDialog'
+import ResolveItemDialog from '../components/items/ResolveItemDialog'
 import ItemFilters from '../components/items/ItemFilters'
 import StatsOverview from '../components/admin/StatsOverview'
 import ItemsTable from '../components/admin/ItemsTable'
@@ -19,16 +20,12 @@ export default function AdminDashboardPage() {
   const { stats, error: statsError, fetchStats } = useAdminStore()
   const { items, meta, filters, loading, error, setFilters, resetFilters, refresh } = useItemList()
   const saving = useItemStore((s) => s.saving)
-  const { toggleStatus, remove } = useItemActions()
+  const { toggleStatus, remove, resolveDialog } = useItemActions({ onStatusChange: () => fetchStats() })
   const [pendingDelete, setPendingDelete] = useState<Item | null>(null)
 
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
-
-  const handleToggleStatus = async (item: Item) => {
-    if (await toggleStatus(item)) fetchStats()
-  }
 
   const handleDelete = async () => {
     if (!pendingDelete) return
@@ -66,7 +63,7 @@ export default function AdminDashboardPage() {
           busy={saving}
           onPageChange={(page) => setFilters({ page })}
           onRowsPerPageChange={(limit) => setFilters({ limit })}
-          onToggleStatus={handleToggleStatus}
+          onToggleStatus={toggleStatus}
           onDelete={setPendingDelete}
         />
       )}
@@ -79,6 +76,7 @@ export default function AdminDashboardPage() {
         onConfirm={handleDelete}
         onClose={() => setPendingDelete(null)}
       />
+      <ResolveItemDialog {...resolveDialog} />
     </>
   )
 }

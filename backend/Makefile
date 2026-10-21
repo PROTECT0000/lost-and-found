@@ -1,4 +1,4 @@
-.PHONY: run build migrate migrate-down migrate-status seed test test-db vet
+.PHONY: run build migrate migrate-down migrate-status seed loadtest test test-db vet
 
 run:            ## Run the API (reads .env)
 	go run ./cmd/api
@@ -18,6 +18,9 @@ migrate-status: ## Show migration status
 
 seed:           ## Insert sample items (idempotent)
 	go run ./cmd/migrate seed
+
+loadtest:       ## Seed items and drive traffic at a running API; pass flags via ARGS="-duration 2m"
+	go run ./cmd/loadtest $(ARGS)
 
 test:           ## Unit tests (MySQL tests are skipped without TEST_DATABASE_DSN)
 	go test ./...

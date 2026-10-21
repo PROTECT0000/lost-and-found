@@ -36,7 +36,9 @@ export default function ItemFilters({ filters, onChange: setFilters, onReset }: 
     }
   }, [debouncedSearch, filters.q, setFilters])
 
-  const hasFilters = Boolean(filters.type || filters.status || filters.category || filters.q)
+  // The Lost/All/Found toggle is always visible with its own "All" option, so it alone does not
+  // count as a filter to clear.
+  const hasFilters = Boolean(filters.status || filters.category || filters.q)
 
   return (
     <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>

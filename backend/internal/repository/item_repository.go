@@ -18,7 +18,8 @@ import (
 var ErrNotFound = errors.New("item not found")
 
 const itemColumns = `id, type, title, description, category, location, occurred_at,
-	contact_name, contact_info, image_key, status, created_at, updated_at`
+	contact_name, contact_info, image_key, status, resolved_by, resolution_note, resolved_at,
+	created_at, updated_at`
 
 // ItemRepository reads and writes items in MySQL.
 type ItemRepository struct {
@@ -98,10 +99,10 @@ func (r *ItemRepository) Get(ctx context.Context, id string) (*model.Item, error
 func (r *ItemRepository) Create(ctx context.Context, in model.NewItem) (*model.Item, error) {
 	id := uuid.NewString()
 	_, err := r.db.ExecContext(ctx, `INSERT INTO items
-		(id, type, title, description, category, location, occurred_at, contact_name, contact_info, image_key, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(id, type, title, description, category, location, occurred_at, contact_name, contact_info, image_key, status, resolved_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, IF(? = 'resolved', CURRENT_TIMESTAMP(3), NULL))`,
 		id, in.Type, in.Title, in.Description, in.Category, in.Location, in.OccurredAt.UTC(),
-		in.ContactName, in.ContactInfo, in.ImageKey, in.Status)
+		in.ContactName, in.ContactInfo, in.ImageKey, in.Status, in.Status)
 	if err != nil {
 		return nil, fmt.Errorf("create item: %w", err)
 	}
@@ -166,6 +167,18 @@ func buildItemSet(c model.ItemChanges) ([]string, []any) {
 	}
 	if c.Status.Set {
 		add("status", c.Status.Value)
+		if c.Status.Value == model.ItemStatusResolved {
+			// Keep the original time when an already-resolved item is saved again.
+			sets = append(sets, "resolved_at = COALESCE(resolved_at, CURRENT_TIMESTAMP(3))")
+		} else {
+			sets = append(sets, "resolved_by = NULL", "resolution_note = NULL", "resolved_at = NULL")
+		}
+	}
+	if c.ResolvedBy.Set {
+		add("resolved_by", c.ResolvedBy.Value)
+	}
+	if c.ResolutionNote.Set {
+		add("resolution_note", c.ResolutionNote.Value)
 	}
 	return sets, args
 }

@@ -309,3 +309,42 @@ func TestStats(t *testing.T) {
 		t.Errorf("stats = %s, want %s", got, want)
 	}
 }
+
+func TestResolveAndReopenTracksResolution(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	created := mustCreate(t, r, nil)
+	if created.ResolvedAt != nil {
+		t.Fatalf("new open item has resolved_at %v", created.ResolvedAt)
+	}
+
+	resolved, err := r.Update(ctx, created.ID, model.ItemChanges{
+		Status:         model.Some(model.ItemStatusResolved),
+		ResolvedBy:     model.Some(ptr("Andi")),
+		ResolutionNote: model.Some(ptr("Showed student ID")),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.ResolvedAt == nil || resolved.ResolvedBy == nil || *resolved.ResolvedBy != "Andi" ||
+		resolved.ResolutionNote == nil || *resolved.ResolutionNote != "Showed student ID" {
+		t.Fatalf("after resolve: %+v", resolved)
+	}
+
+	// Saving the item again as resolved (e.g. from the edit form) keeps the original details.
+	again, err := r.Update(ctx, created.ID, model.ItemChanges{Status: model.Some(model.ItemStatusResolved)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.ResolvedAt == nil || !again.ResolvedAt.Equal(*resolved.ResolvedAt) || again.ResolvedBy == nil {
+		t.Errorf("re-save changed resolution: %+v", again)
+	}
+
+	reopened, err := r.Update(ctx, created.ID, model.ItemChanges{Status: model.Some(model.ItemStatusOpen)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reopened.ResolvedAt != nil || reopened.ResolvedBy != nil || reopened.ResolutionNote != nil {
+		t.Errorf("reopen kept resolution: %+v", reopened)
+	}
+}

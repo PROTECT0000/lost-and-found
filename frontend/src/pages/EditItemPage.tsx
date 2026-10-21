@@ -10,7 +10,16 @@ import ErrorState from '../components/common/ErrorState'
 import PageHeader from '../components/common/PageHeader'
 import ItemForm from '../components/items/form/ItemForm'
 
-const toInput = ({ id: _id, image_url: _i, created_at: _c, updated_at: _u, ...input }: Item): ItemInput => input
+const toInput = ({
+  id: _id,
+  image_url: _i,
+  created_at: _c,
+  updated_at: _u,
+  resolved_by: _rb,
+  resolution_note: _rn,
+  resolved_at: _ra,
+  ...input
+}: Item): ItemInput => input
 
 export default function EditItemPage() {
   const { id = '' } = useParams()

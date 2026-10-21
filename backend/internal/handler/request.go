@@ -19,6 +19,8 @@ const (
 	maxLocation    = 200
 	maxContactName = 100
 	maxContactInfo = 200
+	maxResolvedBy  = 100
+	maxResolution  = 500
 	maxQuery       = 100
 	defaultLimit   = 12
 	maxLimit       = 100
@@ -55,6 +57,10 @@ type UpdateItemRequest struct {
 	// ImageKey set to null removes the photo.
 	ImageKey model.Optional[*string] `json:"image_key"`
 	Status   model.Optional[string]  `json:"status"`
+	// ResolvedBy and ResolutionNote describe who took the item. They are only accepted together
+	// with status "resolved"; reopening an item clears them.
+	ResolvedBy     model.Optional[string] `json:"resolved_by"`
+	ResolutionNote model.Optional[string] `json:"resolution_note"`
 }
 
 // validator collects issues while checking fields.
@@ -76,6 +82,20 @@ func (v *validator) text(field, s string, required bool, max int) string {
 		v.add(field, fmt.Sprintf("Must be at most %d characters", max))
 	}
 	return s
+}
+
+// optionalText trims s and returns nil when it is empty. allowed is false when the field may not
+// be sent in this request (resolution details without status "resolved").
+func (v *validator) optionalText(field, s string, max int, allowed bool) *string {
+	if !allowed {
+		v.add(field, `Only allowed together with status "resolved"`)
+		return nil
+	}
+	s = v.text(field, s, false, max)
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (v *validator) itemType(s string) model.ItemType {
@@ -174,6 +194,13 @@ func (r UpdateItemRequest) Validate() (model.ItemChanges, []Issue) {
 	}
 	if r.Status.Set {
 		c.Status = model.Some(v.status(r.Status.Value))
+	}
+	resolving := c.Status.Set && c.Status.Value == model.ItemStatusResolved
+	if r.ResolvedBy.Set {
+		c.ResolvedBy = model.Some(v.optionalText("resolved_by", r.ResolvedBy.Value, maxResolvedBy, resolving))
+	}
+	if r.ResolutionNote.Set {
+		c.ResolutionNote = model.Some(v.optionalText("resolution_note", r.ResolutionNote.Value, maxResolution, resolving))
 	}
 	if len(v.issues) == 0 && c.IsEmpty() {
 		v.add("", "No fields to update")

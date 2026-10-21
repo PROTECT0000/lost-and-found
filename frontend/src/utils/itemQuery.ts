@@ -1,4 +1,4 @@
-import type { ItemFilters } from '../types/item'
+import type { ItemFilters, ViewMode } from '../types/item'
 import {
   DEFAULT_PAGE_SIZE,
   ITEM_CATEGORY_OPTIONS,
@@ -26,6 +26,11 @@ export function parseItemFilters(params: URLSearchParams): ItemFilters {
     page: Number.isInteger(page) && page > 1 ? page : 1,
     limit: PAGE_SIZE_OPTIONS.includes(limit) ? limit : DEFAULT_PAGE_SIZE,
   }
+}
+
+/** Reads the home page view mode; the card grid is the default and is left out of the URL. */
+export function parseViewMode(params: URLSearchParams): ViewMode {
+  return params.get('view') === 'table' ? 'table' : 'card'
 }
 
 /** Writes filters to URL search params, leaving out defaults to keep links short. */

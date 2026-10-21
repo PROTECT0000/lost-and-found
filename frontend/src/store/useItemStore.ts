@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { itemsApi } from '../api/items'
 import { getErrorMessage } from '../api/client'
-import type { Item, ItemFilters, ItemInput, PaginationMeta } from '../types/item'
+import type { Item, ItemFilters, ItemInput, ItemUpdate, PaginationMeta } from '../types/item'
 import { DEFAULT_PAGE_SIZE } from '../constants/items'
 
 interface ItemState {
@@ -14,7 +14,7 @@ interface ItemState {
   fetchItems: (filters: ItemFilters) => Promise<void>
   fetchItem: (id: string) => Promise<void>
   createItem: (input: ItemInput) => Promise<Item>
-  updateItem: (id: string, input: Partial<ItemInput>) => Promise<Item>
+  updateItem: (id: string, input: ItemUpdate) => Promise<Item>
   deleteItem: (id: string) => Promise<void>
 }
 

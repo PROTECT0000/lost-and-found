@@ -25,11 +25,27 @@ export interface Item {
   /** Derived by the API from image_key. */
   image_url: string | null
   status: ItemStatus
+  /** Who collected or claimed the item; only set when resolved. */
+  resolved_by: string | null
+  resolution_note: string | null
+  /** ISO 8601 UTC datetime of when the item was resolved; null while open. */
+  resolved_at: string | null
   created_at: string
   updated_at: string
 }
 
-export type ItemInput = Omit<Item, 'id' | 'image_url' | 'created_at' | 'updated_at'>
+export type ItemInput = Omit<
+  Item,
+  'id' | 'image_url' | 'created_at' | 'updated_at' | 'resolved_by' | 'resolution_note' | 'resolved_at'
+>
+
+/** Details sent with status "resolved"; reopening an item clears them on the server. */
+export interface ResolutionInput {
+  resolved_by: string
+  resolution_note?: string
+}
+
+export type ItemUpdate = Partial<ItemInput> & Partial<ResolutionInput>
 
 export interface UploadedImage {
   key: string
@@ -44,6 +60,9 @@ export interface ItemFilters {
   page: number
   limit: number
 }
+
+/** How the home page lists items. */
+export type ViewMode = 'card' | 'table'
 
 export interface PaginationMeta {
   page: number

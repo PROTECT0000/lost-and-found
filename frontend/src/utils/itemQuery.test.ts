@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { itemFiltersToParams, parseItemFilters, updateItemFilters } from './itemQuery'
+import { itemFiltersToParams, parseItemFilters, parseViewMode, updateItemFilters } from './itemQuery'
 
 const parse = (query: string) => parseItemFilters(new URLSearchParams(query))
 
@@ -54,5 +54,13 @@ describe('updateItemFilters', () => {
 
   it('clears a filter set to undefined', () => {
     expect(itemFiltersToParams(updateItemFilters(current, { type: undefined })).toString()).toBe('')
+  })
+})
+
+describe('parseViewMode', () => {
+  it('defaults to cards and only accepts "table"', () => {
+    expect(parseViewMode(new URLSearchParams(''))).toBe('card')
+    expect(parseViewMode(new URLSearchParams('view=table'))).toBe('table')
+    expect(parseViewMode(new URLSearchParams('view=list'))).toBe('card')
   })
 })

@@ -58,6 +58,9 @@ func (f *Items) Create(_ context.Context, in model.NewItem) (*model.Item, error)
 		Location: in.Location, OccurredAt: in.OccurredAt, ContactName: in.ContactName, ContactInfo: in.ContactInfo,
 		ImageKey: in.ImageKey, Status: in.Status, CreatedAt: now, UpdatedAt: now,
 	}
+	if in.Status == model.ItemStatusResolved {
+		it.ResolvedAt = &now
+	}
 	f.items[it.ID] = it
 	return &it, nil
 }
@@ -99,6 +102,18 @@ func (f *Items) Update(_ context.Context, id string, c model.ItemChanges) (*mode
 	}
 	if c.Status.Set {
 		it.Status = c.Status.Value
+		if it.Status == model.ItemStatusOpen {
+			it.ResolvedBy, it.ResolutionNote, it.ResolvedAt = nil, nil, nil
+		} else if it.ResolvedAt == nil {
+			now := time.Now().UTC()
+			it.ResolvedAt = &now
+		}
+	}
+	if c.ResolvedBy.Set {
+		it.ResolvedBy = c.ResolvedBy.Value
+	}
+	if c.ResolutionNote.Set {
+		it.ResolutionNote = c.ResolutionNote.Value
 	}
 	it.UpdatedAt = time.Now().UTC()
 	f.items[id] = it

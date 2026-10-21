@@ -74,10 +74,15 @@ type Item struct {
 	// ImageKey is the object key in S3 storage (items/<uuid>.<ext>); nil when there is no photo.
 	ImageKey *string `db:"image_key" json:"image_key"`
 	// ImageURL is derived from ImageKey when building API responses; it is never stored.
-	ImageURL  *string    `db:"-" json:"image_url"`
-	Status    ItemStatus `db:"status" json:"status"`
-	CreatedAt time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time  `db:"updated_at" json:"updated_at"`
+	ImageURL *string    `db:"-" json:"image_url"`
+	Status   ItemStatus `db:"status" json:"status"`
+	// ResolvedBy names who collected or claimed the item; nil unless resolved.
+	ResolvedBy     *string `db:"resolved_by" json:"resolved_by"`
+	ResolutionNote *string `db:"resolution_note" json:"resolution_note"`
+	// ResolvedAt is when the item was marked resolved, in UTC; nil while open.
+	ResolvedAt *time.Time `db:"resolved_at" json:"resolved_at"`
+	CreatedAt  time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt  time.Time  `db:"updated_at" json:"updated_at"`
 }
 
 // NewItem holds validated values for creating an item.
@@ -106,11 +111,16 @@ type ItemChanges struct {
 	ContactInfo Optional[string]
 	// ImageKey with Set == true and a nil Value removes the photo.
 	ImageKey Optional[*string]
-	Status   Optional[ItemStatus]
+	// Status "open" also clears the resolution fields; "resolved" stamps resolved_at if unset.
+	Status Optional[ItemStatus]
+	// ResolvedBy and ResolutionNote are only set together with Status "resolved"; nil clears them.
+	ResolvedBy     Optional[*string]
+	ResolutionNote Optional[*string]
 }
 
 // IsEmpty reports whether no field is being changed.
 func (c ItemChanges) IsEmpty() bool {
 	return !c.Type.Set && !c.Title.Set && !c.Description.Set && !c.Category.Set && !c.Location.Set &&
-		!c.OccurredAt.Set && !c.ContactName.Set && !c.ContactInfo.Set && !c.ImageKey.Set && !c.Status.Set
+		!c.OccurredAt.Set && !c.ContactName.Set && !c.ContactInfo.Set && !c.ImageKey.Set && !c.Status.Set &&
+		!c.ResolvedBy.Set && !c.ResolutionNote.Set
 }

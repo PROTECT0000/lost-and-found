@@ -1,4 +1,4 @@
-import { Button } from '@mui/material'
+import { Button, Stack } from '@mui/material'
 import { Link as RouterLink } from 'react-router-dom'
 import { MdAdd } from 'react-icons/md'
 import { useItemList } from '../hooks/useItemList'
@@ -8,10 +8,13 @@ import ErrorState from '../components/common/ErrorState'
 import LoadingState from '../components/common/LoadingState'
 import ItemFilters from '../components/items/ItemFilters'
 import ItemGrid from '../components/items/ItemGrid'
+import ItemTable from '../components/items/ItemTable'
+import ViewModeToggle from '../components/items/ViewModeToggle'
 import ItemsPagination from '../components/items/ItemsPagination'
 
 export default function HomePage() {
-  const { items, meta, filters, loading, error, setFilters, resetFilters, refresh } = useItemList()
+  const { items, meta, filters, loading, error, setFilters, resetFilters, refresh, viewMode, setViewMode } =
+    useItemList()
 
   const renderContent = () => {
     if (error) return <ErrorState message={error} onRetry={refresh} />
@@ -29,7 +32,7 @@ export default function HomePage() {
         />
       )
     }
-    return <ItemGrid items={items} />
+    return viewMode === 'table' ? <ItemTable items={items} /> : <ItemGrid items={items} />
   }
 
   return (
@@ -37,9 +40,12 @@ export default function HomePage() {
       <PageHeader
         title="Lost & Found"
         action={
-          <Button variant="contained" component={RouterLink} to="/items/new" startIcon={<MdAdd />}>
-            Report item
-          </Button>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <Button variant="contained" component={RouterLink} to="/items/new" startIcon={<MdAdd />}>
+              Report item
+            </Button>
+          </Stack>
         }
       />
       <ItemFilters filters={filters} onChange={setFilters} onReset={resetFilters} />

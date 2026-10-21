@@ -86,7 +86,7 @@ and the home page and admin dashboard each keep their own.
 | GET | `/api/items` | List items. Query: `type` (lost/found), `status` (open/resolved), `category`, `q`, `page`, `limit` |
 | GET | `/api/items/:id` | Get one item |
 | POST | `/api/items` | Create item |
-| PATCH | `/api/items/:id` | 🔒 Partially update item |
+| PATCH | `/api/items/:id` | 🔒 Partially update item; `resolved_by`/`resolution_note` are accepted with `status: "resolved"`, and reopening clears them |
 | DELETE | `/api/items/:id` | 🔒 Delete item |
 | POST | `/api/auth/login` | `{ "password": "..." }` → `{ token, expiresAt }` |
 | GET | `/api/auth/me` | 🔒 Check the token |
@@ -125,6 +125,13 @@ Categories: `electronics`, `wallet`, `keys`, `bag`, `clothing`, `documents`, `je
   (`monitoring/grafana/dashboards/lost-and-found.json`): up/down, request rate, 5xx rate, latency
   percentiles per route, status classes, image uploads and cleanups, MySQL pool usage and waits, and Go runtime.
 - **Health:** `/api/health` (liveness) and `/api/health/ready` (readiness; details only in logs).
+- **Load test:** with the stack running, `./loadtest.sh` (or `make loadtest` in `backend/`) logs in as admin,
+  seeds items through the API (some with photos, about a third resolved), then runs a weighted mix of
+  list/search, detail, create, resolve/reopen, admin stats, 404 and 400 requests and prints p50/p95/p99 per request.
+  Open Grafana at http://localhost:3000 to watch the dashboard fill in. Flags: `-base` (default
+  `http://localhost:8787`), `-password` (default `$ADMIN_PASSWORD` or `change-me`), `-seed 200`,
+  `-duration 60s` (`0` only seeds), `-concurrency 20`, `-images 0.2`.
+  Example: `./loadtest.sh -seed 500 -duration 2m -concurrency 50`.
 
 ## CI/CD
 

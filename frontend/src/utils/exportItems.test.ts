@@ -16,6 +16,9 @@ const item: Item = {
   image_key: 'items/abc.png',
   image_url: '/api/uploads/items/abc.png',
   status: 'open',
+  resolved_by: null,
+  resolution_note: null,
+  resolved_at: null,
   created_at: '2026-10-21T03:00:00Z',
   updated_at: '2026-10-21T03:00:00Z',
 }

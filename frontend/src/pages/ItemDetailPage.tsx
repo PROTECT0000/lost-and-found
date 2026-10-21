@@ -9,13 +9,14 @@ import ConfirmDialog from '../components/common/ConfirmDialog'
 import ErrorState from '../components/common/ErrorState'
 import ItemActions from '../components/items/ItemActions'
 import ItemDetails from '../components/items/ItemDetails'
+import ResolveItemDialog from '../components/items/ResolveItemDialog'
 
 export default function ItemDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const isAdmin = useIsAdmin()
   const { current: item, loading, saving, error, fetchItem } = useItemStore()
-  const { toggleStatus, remove } = useItemActions()
+  const { toggleStatus, remove, resolveDialog } = useItemActions()
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export default function ItemDetailPage() {
         onConfirm={handleDelete}
         onClose={() => setConfirmOpen(false)}
       />
+      <ResolveItemDialog {...resolveDialog} />
     </>
   )
 }

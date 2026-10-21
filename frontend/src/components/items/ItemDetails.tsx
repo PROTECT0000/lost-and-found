@@ -1,7 +1,7 @@
-import { Card, CardContent, Divider, Grid, Stack, Typography } from '@mui/material'
+import { Alert, AlertTitle, Card, CardContent, Divider, Grid, Stack, Typography } from '@mui/material'
 import { MdCategory, MdEvent, MdLocationOn, MdPerson, MdPhone, MdUpdate } from 'react-icons/md'
 import type { Item } from '../../types/item'
-import { categoryLabel } from '../../constants/items'
+import { categoryLabel, resolvedByLabel } from '../../constants/items'
 import { formatDateTime } from '../../utils/format'
 import InfoRow from '../common/InfoRow'
 import ItemImage from './ItemImage'
@@ -23,6 +23,21 @@ export default function ItemDetails({ item }: { item: Item }) {
         <Typography color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
           {item.description || 'No description provided.'}
         </Typography>
+        {item.status === 'resolved' && (item.resolved_by || item.resolved_at) && (
+          <Alert severity="success" sx={{ mt: 3 }}>
+            <AlertTitle>Resolved{item.resolved_at && ` on ${formatDateTime(item.resolved_at)}`}</AlertTitle>
+            {item.resolved_by && (
+              <Typography variant="body2">
+                {resolvedByLabel(item)}: <strong>{item.resolved_by}</strong>
+              </Typography>
+            )}
+            {item.resolution_note && (
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-line', mt: 0.5 }}>
+                {item.resolution_note}
+              </Typography>
+            )}
+          </Alert>
+        )}
         <Divider sx={{ my: 3 }} />
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, sm: 6 }}>
