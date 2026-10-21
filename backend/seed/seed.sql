@@ -1,0 +1,5 @@
+INSERT IGNORE INTO items (id, type, title, description, category, location, occurred_at, contact_name, contact_info, status) VALUES
+  ('00000000-0000-4000-8000-000000000001', 'lost', 'Black leather wallet', 'Contains ID card and a few bank cards.', 'wallet', 'Central Library, 2nd floor', '2026-10-18 07:30:00', 'Rina', 'rina@example.com', 'open'),
+  ('00000000-0000-4000-8000-000000000002', 'found', 'Silver house keys', 'Bunch of 3 keys with a blue keychain.', 'keys', 'Bus stop near Main Street', '2026-10-19 11:15:00', 'Budi', '+62 812 0000 0000', 'open'),
+  ('00000000-0000-4000-8000-000000000003', 'lost', 'Wireless earbuds', 'White case, left earbud has a small scratch.', 'electronics', 'Campus cafeteria', '2026-10-15 05:45:00', 'Sari', 'sari@example.com', 'resolved'),
+  ('00000000-0000-4000-8000-000000000004', 'found', 'Navy blue backpack', 'Has notebooks and a water bottle inside.', 'bag', 'Train station, platform 3', '2026-10-20 09:00:00', 'Dimas', 'dimas@example.com', 'open');
