@@ -43,7 +43,7 @@ func New(cfg config.S3Config) (*Storage, error) {
 		Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
 		Secure: endpoint.Scheme == "https",
 		Region: cfg.Region,
-		// Path-style ({endpoint}/{bucket}/{key}) works with R2, MinIO, SeaweedFS and AWS regional endpoints.
+		// Path-style ({endpoint}/{bucket}/{key}) works with R2, MinIO and AWS regional endpoints.
 		BucketLookup: minio.BucketLookupPath,
 	})
 	if err != nil {

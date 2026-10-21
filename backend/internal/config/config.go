@@ -41,9 +41,9 @@ type Config struct {
 	S3 S3Config `envPrefix:"S3_"`
 }
 
-// S3Config holds settings for S3-compatible object storage (AWS S3, Cloudflare R2, MinIO, SeaweedFS, ...).
+// S3Config holds settings for S3-compatible object storage (AWS S3, Cloudflare R2, MinIO, ...).
 type S3Config struct {
-	// Endpoint is the storage URL, e.g. http://localhost:8333. The scheme decides whether TLS is used.
+	// Endpoint is the storage URL, e.g. http://localhost:9000. The scheme decides whether TLS is used.
 	Endpoint string `env:"ENDPOINT,required,notEmpty"`
 	// Region is the bucket region ("auto" works for Cloudflare R2).
 	Region string `env:"REGION" envDefault:"us-east-1"`
