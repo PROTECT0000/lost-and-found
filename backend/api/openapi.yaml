@@ -2,6 +2,9 @@ openapi: 3.1.0
 info:
   title: Lost & Found API
   version: 1.0.0
+  license:
+    name: MIT
+    identifier: MIT
   description: |
     Report and browse lost and found items.
 

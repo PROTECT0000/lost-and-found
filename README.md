@@ -182,3 +182,7 @@ are added automatically. Storage settings:
 Set `CORS_ORIGINS` to your frontend's URL in production.
 
 Frontend (e.g. Cloudflare Pages): build with `VITE_API_URL=https://<your-api-host> npm run build` and deploy `frontend/dist`. `public/_redirects` provides the SPA fallback so deep links work.
+
+## License
+
+[MIT](LICENSE) © 2026 Akmal Fairuz
