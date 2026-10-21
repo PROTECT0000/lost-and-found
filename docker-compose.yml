@@ -82,8 +82,16 @@ services:
     command: ["up"]
     environment:
       DATABASE_DSN: ${MYSQL_USER:-lostfound}:${MYSQL_PASSWORD:-lostfound}@tcp(mysql:3306)/lost_and_found
+      # Only `seed` uses storage: it uploads the sample photos.
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: lost-and-found
+      S3_ACCESS_KEY_ID: *minio-user
+      S3_SECRET_ACCESS_KEY: *minio-password
     depends_on:
       mysql:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   backend:

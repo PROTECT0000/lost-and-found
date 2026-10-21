@@ -15,7 +15,7 @@ You only need [Docker](https://docs.docker.com/get-docker/).
 
 Then open **http://localhost:8080**.
 
-To add some sample items:
+To add 14 sample items with photos:
 
 ```bash
 docker compose run --rm migrate seed
